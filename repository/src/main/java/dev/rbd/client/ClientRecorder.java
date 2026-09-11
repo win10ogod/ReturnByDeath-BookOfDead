@@ -2,7 +2,6 @@ package dev.rbd.client;
 import com.google.gson.*;
 import com.mojang.blaze3d.platform.NativeImage;
 import dev.rbd.RbdConfig;
-import dev.rbd.memory.MemoryArchive;
 import dev.rbd.network.RbdNetwork;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
@@ -10,10 +9,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.RenderFrameEvent;
-import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.zip.GZIPOutputStream;
 @EventBusSubscriber(modid="rbd",value=Dist.CLIENT)
 public final class ClientRecorder {
     private static long lastTick=Long.MIN_VALUE;
@@ -26,12 +22,10 @@ public final class ClientRecorder {
         try(NativeImage image=Screenshot.takeScreenshot(mc.getMainRenderTarget())){
             int configured=RbdConfig.CLIENT_WIDTH.get();int width=configured==0?image.getWidth():configured;
             int height=Math.max(1,(int)((long)width*image.getHeight()/image.getWidth()));byte[] png;
-            if(width==image.getWidth())png=image.asByteArray();
-            else try(NativeImage scaled=new NativeImage(width,height,false)){image.resizeSubRectTo(0,0,image.getWidth(),image.getHeight(),scaled);png=scaled.asByteArray();}
-            JsonObject view=new JsonObject();view.addProperty("width",width);view.addProperty("height",height);view.addProperty("png",Base64.getEncoder().encodeToString(png));
-            ByteArrayOutputStream output=new ByteArrayOutputStream();try(GZIPOutputStream gzip=new GZIPOutputStream(output)){gzip.write(view.toString().getBytes(StandardCharsets.UTF_8));}
-            String data=Base64.getEncoder().encodeToString(output.toByteArray());String id=UUID.randomUUID().toString();int count=(data.length()+23999)/24000;
-            for(int part=0;part<count;part++){var msg=RbdNetwork.message("image_chunk");msg.addProperty("id",id);msg.addProperty("part",part);msg.addProperty("count",count);msg.addProperty("data",data.substring(part*24000,Math.min(data.length(),(part+1)*24000)));RbdClient.send(msg);}
+            if(width==image.getWidth())png=dev.rbd.io.LosslessPng.encode(width,height,image.getPixelsRGBA());
+            else try(NativeImage scaled=new NativeImage(width,height,false)){image.resizeSubRectTo(0,0,image.getWidth(),image.getHeight(),scaled);png=dev.rbd.io.LosslessPng.encode(width,height,scaled.getPixelsRGBA());}
+            String data=Base64.getEncoder().encodeToString(png);String id=UUID.randomUUID().toString();int count=(data.length()+23999)/24000;
+            for(int part=0;part<count;part++){var msg=RbdNetwork.message("image_chunk");msg.addProperty("id",id);msg.addProperty("part",part);msg.addProperty("count",count);if(part==0){msg.addProperty("encoding","png");msg.addProperty("width",width);msg.addProperty("height",height);}msg.addProperty("data",data.substring(part*24000,Math.min(data.length(),(part+1)*24000)));RbdClient.send(msg);}
         }catch(Exception ex){mc.player.displayClientMessage(net.minecraft.network.chat.Component.literal("RBD memory image: "+ex.getMessage()),true);}
     }
 }

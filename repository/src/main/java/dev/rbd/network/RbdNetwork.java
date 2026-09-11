@@ -11,7 +11,7 @@ import java.util.zip.*;
 public final class RbdNetwork {
     private RbdNetwork(){}
     public static void register(RegisterPayloadHandlersEvent event){
-        event.registrar("5").playBidirectional(MessagePayload.TYPE,MessagePayload.CODEC,(payload,context)->{
+        event.registrar("6").playBidirectional(MessagePayload.TYPE,MessagePayload.CODEC,(payload,context)->{
             if(context.player() instanceof ServerPlayer player){
                 try{if(GameSession.current!=null)GameSession.current.message(player,JsonParser.parseString(payload.json()).getAsJsonObject());}
                 catch(Exception e){player.displayClientMessage(net.minecraft.network.chat.Component.literal("RBD: "+e.getMessage()),true);}
