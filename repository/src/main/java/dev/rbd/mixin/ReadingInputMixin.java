@@ -9,5 +9,5 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class ReadingInputMixin {
     @Shadow public ServerPlayer player;
     @Inject(method={"handleMovePlayer","handleMoveVehicle","handlePlayerInput","handleInteract","handleUseItem","handleUseItemOn","handlePlayerAction","handleContainerClick","handleSetCreativeModeSlot","handlePlayerCommand"},at=@At("HEAD"),cancellable=true)
-    private void rbd$readOnly(CallbackInfo ci){var game=GameSession.current;if(game!=null&&(game.transitioning||game.reading(player.getUUID())))ci.cancel();}
+    private void rbd$readOnly(CallbackInfo ci){var game=GameSession.current;if(game!=null&&(game.transitioning||(dev.rbd.RbdConfig.READ_LOCK.get()&&game.reading(player.getUUID()))))ci.cancel();}
 }

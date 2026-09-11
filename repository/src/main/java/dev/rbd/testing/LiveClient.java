@@ -14,9 +14,15 @@ import net.neoforged.neoforge.client.event.*;
 public final class LiveClient {
     private static boolean started,shot,attemptedMove,libraryShot,endingShot,silenceShot,reducedShot,returnShot,earlyAck,toggledReduced,restoredEffects;
     private static int doneTicks,memoryFrames,libraryFrames;
+    private static Object originalConnection;
+    private static boolean openedPauseDuringReturn;
+    @SubscribeEvent public static void login(ClientPlayerNetworkEvent.LoggingIn e){if(LiveScenario.ENABLED){LiveScenario.clientLogins++;if(originalConnection==null)originalConnection=e.getConnection();else LiveScenario.sameClientConnection&=originalConnection==e.getConnection();}}
     @SubscribeEvent public static void tick(ClientTickEvent.Post e){
         if(!LiveScenario.ENABLED)return;Minecraft mc=Minecraft.getInstance();
         mc.options.pauseOnLostFocus=false;
+        LiveScenario.clientResets=dev.rbd.client.ConnectedClientReturn.completedResets;
+        if(dev.rbd.client.ConnectedClientReturn.paused&&!openedPauseDuringReturn&&mc.player!=null&&mc.screen==null){openedPauseDuringReturn=true;mc.setScreen(new net.minecraft.client.gui.screens.PauseScreen(true));}
+        if(openedPauseDuringReturn&&!dev.rbd.client.ConnectedClientReturn.paused){LiveScenario.pauseMenuReturn=true;if(mc.screen instanceof net.minecraft.client.gui.screens.PauseScreen)mc.setScreen(null);}
         if(started&&mc.screen instanceof net.minecraft.client.gui.screens.BackupConfirmScreen screen){
             // Only our explicitly created disposable fixture can reach this branch.
             screen.children().stream().filter(w->w instanceof net.minecraft.client.gui.components.Button)
@@ -44,6 +50,7 @@ public final class LiveClient {
     }
     @SubscribeEvent public static void rendered(RenderFrameEvent.Post e){
         if(!LiveScenario.ENABLED)return;var mc=Minecraft.getInstance();
+        if(openedPauseDuringReturn&&dev.rbd.client.ConnectedClientReturn.paused&&mc.isPaused()&&mc.screen instanceof net.minecraft.client.gui.screens.PauseScreen)LiveScenario.pauseMenuObserved=true;
         if(dev.rbd.client.ImmersionOverlay.isBlack()&&!returnShot){Screenshot.grab(mc.gameDirectory,"rbd-return-silence.png",mc.getMainRenderTarget(),message->{});returnShot=true;LiveScenario.returnBlackPresented=true;}
         if(mc.screen instanceof MemoryScreen memory&&memory.experiencingDeath()){
             if(memory.deathElapsed()>0.4&&!endingShot){Screenshot.grab(mc.gameDirectory,"rbd-memory-ending.png",mc.getMainRenderTarget(),message->{});endingShot=true;LiveScenario.endingPresented=true;}

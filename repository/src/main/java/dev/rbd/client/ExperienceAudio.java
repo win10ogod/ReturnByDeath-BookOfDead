@@ -31,7 +31,7 @@ public final class ExperienceAudio {
     public static void recorded(String id,float volume,float pitch){
         var location=ResourceLocation.tryParse(id);if(location!=null){var sound=new SubjectiveSound(location,volume,pitch);owned.add(sound);Minecraft.getInstance().getSoundManager().play(sound);}
     }
-    public static void cue(String id,float volume,float pitch){recorded("rbd:"+id,volume*ImmersionConfig.AUDIO.get().floatValue(),pitch);}
+    public static void cue(String id,float volume,float pitch){recorded("rbd:"+id,volume*(float)ImmersionConfig.audio(),pitch);}
     private static void stopOwned(){for(var sound:owned)Minecraft.getInstance().getSoundManager().stop(sound);owned.clear();}
     public static void silence(){if(!silenced){stopOwned();silenced=true;}}
     public static void tick(MortalExperience.Profile profile,float audible){

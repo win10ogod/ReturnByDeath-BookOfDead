@@ -20,7 +20,7 @@ public final class ClientRecorder {
     @SubscribeEvent public static void rendered(RenderFrameEvent.Post e){
         Minecraft mc=Minecraft.getInstance();
         if(mc.level==null||mc.player==null||!mc.options.getCameraType().isFirstPerson()||mc.screen instanceof MemoryScreen)return;
-        if(ImmersionOverlay.isSeparated())return;
+        if(ImmersionOverlay.isSeparated()||ConnectedClientReturn.paused)return;
         if(mc.getOverlay()!=null||mc.screen instanceof net.minecraft.client.gui.screens.ReceivingLevelScreen||mc.screen instanceof net.minecraft.client.gui.screens.ProgressScreen||mc.screen instanceof net.minecraft.client.gui.screens.GenericMessageScreen)return;
         long tick=mc.level.getGameTime();if(tick==lastTick||Math.floorMod(tick,RbdConfig.VISUAL_INTERVAL.get())!=0)return;lastTick=tick;
         try(NativeImage image=Screenshot.takeScreenshot(mc.getMainRenderTarget())){

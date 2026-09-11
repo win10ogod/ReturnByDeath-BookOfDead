@@ -28,12 +28,21 @@ public final class LiveScenario {
     private static int dyingTick;
     private static net.minecraft.world.phys.Vec3 readPosition;
     public static volatile String failure;
+    public static volatile int clientLogins;
+    public static volatile int clientResets;
+    public static volatile boolean sameClientConnection=true;
+    public static volatile boolean pauseMenuReturn;
+    public static volatile boolean pauseMenuObserved;
+    private static net.minecraft.server.MinecraftServer originalServer;
+    private static Object originalPlayerConnection;
     @SubscribeEvent public static void tick(ServerTickEvent.Post e){
         if(!ENABLED||completed||failure!=null)return;
         var game=GameSession.current;if(game==null||game.transitioning||!game.snapshots.world.getFileName().toString().startsWith("RbdLiveTest-"))return;
         if(game.holders().isEmpty())return; // The integrated server ticks before its first player joins.
         var p=game.server.getPlayerList().getPlayer(game.onlyHolder());if(p==null)return;
         try{
+            if(originalServer==null){originalServer=game.server;originalPlayerConnection=p.connection;}
+            require(game.server==originalServer&&p.connection==originalPlayerConnection,"singleplayer return retains its server and play connection");
             if(stage==5){
                 if(game!=dyingSession)stage=2;
                 else {require(game.server.getTickCount()-dyingTick<240,"environmental death must cause an actual world return");return;}
@@ -105,6 +114,9 @@ public final class LiveScenario {
                 ArchiveLibrary.browse(game,p,shelf,index,0);stage=4;
             }else if(stage==4){
                 if(!libraryPresented)return;
+                require(clientLogins==1&&sameClientConnection,"integrated client never disconnects or logs in again during returns");
+                require(pauseMenuReturn&&pauseMenuObserved,"opening the pause menu does not save closed worlds or deadlock return");
+                try(var files=Files.list(game.snapshots.control.resolve("receipts"))){require(clientResets==files.filter(path->path.toString().endsWith(".json")).count(),"every world transaction completed its client cache reset");}
                 var report=new JsonObject();report.addProperty("result","PASS");report.addProperty("returns",returns);report.addProperty("books",3);report.addProperty("world",game.snapshots.world.toString());
                 report.addProperty("verified","3 environmental deaths (drowning, heat, falling) and integrated returns; overworld/Nether/inventory/containers/XP/NPC restoration; totem; irreversible pre-checkpoint loss; injured checkpoint; distinct lives; branch visibility; native first-person playback; full death ending/silence; reduced effects; premature ack cannot skip ending; reading death is not actual death; nested memory; rejected movement; physical library UI");
                 AtomicJson.write(Path.of("rbd-live-report.json").toAbsolutePath(),report);completed=true;

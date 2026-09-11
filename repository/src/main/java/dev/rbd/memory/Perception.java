@@ -12,16 +12,16 @@ import java.util.*;
 
 /** NPC perception uses first-hit rays. Occluded entities and container contents never enter a frame. */
 public final class Perception {
-    public static boolean recorded(LivingEntity e){return e instanceof Player||e instanceof Villager||e.hasCustomName()||RbdConfig.RECORD_CREATURES.get();}
+    public static boolean recorded(LivingEntity e){return (dev.rbd.runtime.GameSession.current!=null&&dev.rbd.runtime.GameSession.current.isHolder(e.getUUID()))||(e instanceof Player?RbdConfig.RECORD_PLAYERS.get():e instanceof Villager?RbdConfig.RECORD_VILLAGERS.get():e.hasCustomName()?RbdConfig.RECORD_NAMED.get():RbdConfig.RECORD_CREATURES.get());}
     public static String name(LivingEntity e){
         if(e instanceof Player||e.hasCustomName())return e.getName().getString();
         return e.getName().getString()+" · "+e.getUUID().toString().substring(0,4);
     }
     public static List<MemoryFrame.Contact> contacts(LivingEntity subject){
         Vec3 eye=subject.getEyePosition(),look=subject.getLookAngle();List<MemoryFrame.Contact> out=new ArrayList<>();
-        for(LivingEntity other:subject.level().getEntitiesOfClass(LivingEntity.class,subject.getBoundingBox().inflate(16),e->e!=subject&&(e instanceof Player||e.hasCustomName())&&!e.isInvisible())){
+        for(LivingEntity other:subject.level().getEntitiesOfClass(LivingEntity.class,subject.getBoundingBox().inflate(RbdConfig.CONTACT_RANGE.get()),e->e!=subject&&(e instanceof Player||e.hasCustomName())&&!e.isInvisible())){
             Vec3 delta=other.getEyePosition().subtract(eye);
-            if(delta.normalize().dot(look)>0.65&&subject.hasLineOfSight(other))out.add(new MemoryFrame.Contact(other.getUUID(),name(other),other.getType().toString()));
+            if(delta.normalize().dot(look)>RbdConfig.CONTACT_DOT.get()&&subject.hasLineOfSight(other))out.add(new MemoryFrame.Contact(other.getUUID(),name(other),other.getType().toString()));
         }return out;
     }
     public static int[] raster(LivingEntity subject,int width,int height){
@@ -31,7 +31,7 @@ public final class Perception {
         List<LivingEntity> entities=level.getEntitiesOfClass(LivingEntity.class,subject.getBoundingBox().inflate(distance),e->e!=subject&&!e.isInvisible());
         var cache=new HashMap<BlockPos,net.minecraft.world.level.block.state.BlockState>();
         for(int y=0;y<height;y++)for(int x=0;x<width;x++){
-            Vec3 direction=forward.add(right.scale((2.0*(x+0.5)/width-1)*0.70*width/height)).add(up.scale((1-2.0*(y+0.5)/height)*0.70)).normalize();
+            Vec3 direction=forward.add(right.scale((2.0*(x+0.5)/width-1)*RbdConfig.RASTER_FOV.get()*width/height)).add(up.scale((1-2.0*(y+0.5)/height)*RbdConfig.RASTER_FOV.get())).normalize();
             Vec3 end=eye.add(direction.scale(distance));
             var hit=level.clip(new ClipContext(eye,end,ClipContext.Block.VISUAL,ClipContext.Fluid.ANY,subject));
             double nearest=hit.getType()==HitResult.Type.MISS?distance:eye.distanceTo(hit.getLocation());

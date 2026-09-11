@@ -15,9 +15,9 @@ public final class ArchiveLibrary {
     private static final Map<UUID,Visit> visits=new HashMap<>();
     public static void clear(){visits.clear();}
     public static void generate(GameSession game){
-        if(game.branch.json.has("library"))return;
+        if(game.branch.json.has("library")||!RbdConfig.LIBRARY_GENERATE.get())return;
         ServerLevel level=game.server.overworld();BlockPos spawn=level.getSharedSpawnPos();
-        int x=spawn.getX()+48,z=spawn.getZ()+48;
+        int x=spawn.getX()+RbdConfig.LIBRARY_X.get(),z=spawn.getZ()+RbdConfig.LIBRARY_Z.get();
         int y=0;
         for(int attempt=0;attempt<32;attempt++){
             y=level.getSeaLevel()+1;
@@ -55,7 +55,7 @@ public final class ArchiveLibrary {
         JsonObject location=new JsonObject();location.addProperty("x",x);location.addProperty("y",y);location.addProperty("z",z);game.branch.json.add("library",location);game.branch.setDirty();
     }
     public static void browse(GameSession game,ServerPlayer p,BlockPos pos,int index,int page) throws IOException {
-        if(p.blockPosition().distSqr(pos)>64||!p.level().getBlockState(pos).is(ModContent.SHELF.get()))return;
+        if(p.blockPosition().distSqr(pos)>Math.pow(RbdConfig.LIBRARY_REACH.get(),2)||!p.level().getBlockState(pos).is(ModContent.SHELF.get()))return;
         var books=game.archive.books().stream().filter(game::visible).filter(b->Integer.parseInt(b.get("id").getAsString().substring(0,1),16)==index).toList();
         int pages=Math.max(1,(books.size()+7)/8);page=Math.max(0,Math.min(page,pages-1));
         var msg=RbdNetwork.message("shelf");msg.addProperty("page",page);msg.addProperty("pages",pages);msg.addProperty("shelf",index+1);
@@ -69,7 +69,7 @@ public final class ArchiveLibrary {
         msg.add("entries",entries);visits.put(p.getUUID(),new Visit(pos.immutable(),p.level().dimension().location().toString(),index,page,offered));RbdNetwork.send(p,msg);
     }
     private static Visit valid(ServerPlayer p){
-        var v=visits.get(p.getUUID());return v!=null&&p.blockPosition().distSqr(v.pos)<=64&&p.level().dimension().location().toString().equals(v.dimension)&&p.level().getBlockState(v.pos).is(ModContent.SHELF.get())?v:null;
+        var v=visits.get(p.getUUID());return v!=null&&p.blockPosition().distSqr(v.pos)<=Math.pow(RbdConfig.LIBRARY_REACH.get(),2)&&p.level().dimension().location().toString().equals(v.dimension)&&p.level().getBlockState(v.pos).is(ModContent.SHELF.get())?v:null;
     }
     public static void page(GameSession game,ServerPlayer p,int direction) throws IOException {var v=valid(p);if(v!=null)browse(game,p,v.pos,v.index,v.page+Integer.signum(direction));}
     public static void select(GameSession game,ServerPlayer p,String id) throws IOException {

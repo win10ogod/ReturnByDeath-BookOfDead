@@ -37,11 +37,20 @@ public final class GameSession implements AutoCloseable {
     }
     public GameSession(MinecraftServer server) throws IOException {
         this.server=server;Path world=server.getWorldPath(LevelResource.ROOT).toRealPath();
-        supervisor=server.isDedicatedServer()&&System.getenv("RBD_CONTROL_DIR")!=null?new SupervisorBridge(server):null;
+        supervisor=Boolean.getBoolean("rbd.legacySupervisor")&&server.isDedicatedServer()&&System.getenv("RBD_CONTROL_DIR")!=null?new SupervisorBridge(server):null;
         snapshots=new SnapshotStore(world,supervisor!=null?supervisor.control():SnapshotStore.controlFor(world));
         if(supervisor==null&&snapshots.pending())throw new IOException("Pending return must be recovered before opening the world");
         if(Files.exists(snapshots.control.resolve("fault.json")))throw new IOException("RBD archive has an unresolved fault: "+snapshots.control.resolve("fault.json"));
-        branch=BranchData.get(server);archive=new MemoryArchive(snapshots.control.resolve("memories"));recorder=new MemoryRecorder(this);
+        branch=BranchData.get(server);
+        Path rulesFile=snapshots.control.resolve("returned_rules.json");
+        if(Files.exists(rulesFile)){
+            var restoredRules=AtomicJson.read(rulesFile);String id=restoredRules.get("id").getAsString();
+            if(!branch.json.has("rulesTransaction")||!branch.json.get("rulesTransaction").getAsString().equals(id)){
+                dev.rbd.rules.WorldRules.apply(server.getWorldData().getGameRules(),restoredRules.getAsJsonObject("values"));
+                branch.json.addProperty("rulesTransaction",id);branch.setDirty();
+            }
+        }
+        archive=new MemoryArchive(snapshots.control.resolve("memories"));recorder=new MemoryRecorder(this);
         Path authority=snapshots.control.resolve("authority.json");
         authorities=new AuthorityRoster(Files.exists(authority)?AtomicJson.read(authority):new JsonObject());
         restoreContinuations();
@@ -55,7 +64,6 @@ public final class GameSession implements AutoCloseable {
     public void saveSoul() throws IOException {AtomicJson.write(snapshots.control.resolve("authority.json"),authorities.json());}
     public void bind(ServerPlayer p) throws IOException {
         if(transitioning||returnPending())throw new IOException("Cannot grant authority during a return");
-        if(server.isDedicatedServer()&&supervisor==null)throw new IOException("Dedicated returns require the supplied offline supervisor");
         JsonObject person=authorities.bind(p.getUUID(),p.getGameProfile().getName(),RbdConfig.MAX_HOLDERS.get());
         JsonObject known=branch.object("knowledge");
         if(!person.has("knowledge")&&known.has(p.getUUID().toString()))person.add("knowledge",known.get(p.getUUID().toString()).deepCopy());
@@ -90,11 +98,12 @@ public final class GameSession implements AutoCloseable {
         var evidence=MemoryArchive.GSON.toJsonTree(contact).getAsJsonObject();evidence.addProperty("source","EXPERIENCED_MEMORY");evidence.addProperty("book",book);evidence.addProperty("sequence",sequence);knowledge(who).add(contact.soul().toString(),evidence);
     }
     public void login(ServerPlayer p){
+        dev.rbd.rules.WorldRules.send(p);
         if(isHolder(p.getUUID())&&soul(p.getUUID()).has("lastDeath")){var msg=RbdNetwork.message("return_imprint");msg.add("imprint",soul(p.getUUID()).get("lastDeath"));RbdNetwork.send(p,msg);}
     }
     public boolean recognizes(UUID reader,UUID target){if(isHolder(reader)&&flag(reader,"memorySealed"))return reader.equals(target);
         if(isHolder(target)&&flag(target,"nameSealed"))return reader.equals(target);
-        return reader.equals(target)||knowledge(reader).has(target.toString());}
+        return !RbdConfig.REQUIRE_KNOWN.get()||reader.equals(target)||knowledge(reader).has(target.toString());}
     public boolean visible(JsonObject book){return book.get("authority").getAsBoolean()||branch.object("visibleBooks").has(book.get("id").getAsString());}
     public boolean flag(UUID id,String key){return isHolder(id)&&soul(id).has(key)&&soul(id).get(key).getAsBoolean();}
     public void milestone(String id){
@@ -122,24 +131,25 @@ public final class GameSession implements AutoCloseable {
             }
         }
         saveSoul();
-        if(supervisor!=null)supervisor.request(operation,death);else snapshots.prepare(operation,death);
+        if(supervisor!=null)supervisor.request(operation,death);else snapshots.prepare(operation,death,dev.rbd.rules.WorldRules.export(server.getWorldData().getGameRules()));
         transitioning=true;
         for(ServerPlayer p:server.getPlayerList().getPlayers()){
             endReading(p);var msg=RbdNetwork.message("transition");msg.addProperty("operation",operation);
+            msg.addProperty("connected",supervisor==null);
             JsonObject ownDeath=pendingDeaths.get(p.getUUID());
             if(ownDeath!=null)msg.add("ending",ownDeath.get("ending"));
             RbdNetwork.send(p,msg);
         }
-        // Defer halt to the next tick so the local client receives the transition packet first.
+        if(supervisor==null)ConnectedReturn.begin(this);
     }
     public void tick() throws IOException {
-        if(transitioning){server.halt(false);return;}
+        if(transitioning){if(supervisor!=null)server.halt(false);return;}
         if(returnPending()){
             JsonObject death=pendingDeaths.values().iterator().next().deepCopy();JsonArray all=new JsonArray();pendingDeaths.values().forEach(b->all.add(b.deepCopy()));death.add("deaths",all);
             transition("RESTORE",death);return;
         }
         recorder.tick();
-        if(server.getTickCount()%100==0)saveSoul();
+        if(server.getTickCount()%RbdConfig.SOUL_SAVE_TICKS.get()==0)saveSoul();
         for(var entry:List.copyOf(readings.entrySet())){
             ServerPlayer p=server.getPlayerList().getPlayer(entry.getKey());
             if(p==null||!p.isAlive()){if(p!=null)endReading(p);else {entry.getValue().close();readings.remove(entry.getKey());}continue;}
@@ -162,7 +172,7 @@ public final class GameSession implements AutoCloseable {
         JsonObject book=recorder.death(actor,cause);
         if(isHolder(actor.getUUID())){
             JsonObject soul=soul(actor.getUUID());
-            double miasma=soul.has("miasma")?soul.get("miasma").getAsDouble():0;soul.addProperty("miasma",miasma+1);
+            double miasma=soul.has("miasma")?soul.get("miasma").getAsDouble():0;soul.addProperty("miasma",miasma+RbdConfig.DEATH_MIASMA.get());
             // Supervisor v1 needs the death fields alongside the complete memory-book reference.
             book.addProperty("soul_id",actor.getUUID().toString());book.addProperty("original_name",Perception.name(actor));
             book.addProperty("dimension",actor.level().dimension().location().toString());book.addProperty("world_tick",actor.level().getGameTime());
@@ -174,6 +184,7 @@ public final class GameSession implements AutoCloseable {
     }
     public void open(ServerPlayer p,String id) throws IOException {
         JsonObject book=archive.book(id);
+        if(!RbdConfig.SELF_READING.get()&&book.get("soul").getAsString().equals(p.getUUID().toString()))return;
         if(!visible(book)||!recognizes(p.getUUID(),UUID.fromString(book.get("soul").getAsString()))){p.displayClientMessage(Component.translatable("message.rbd.unfamiliar"),true);return;}
         if(transitioning||readings.containsKey(p.getUUID()))return;
         Reading reading=new Reading(book,archive.reader(book.get("head").getAsString()));readings.put(p.getUUID(),reading);recorder.clearImage(p.getUUID());
@@ -187,6 +198,7 @@ public final class GameSession implements AutoCloseable {
     }
     public boolean reading(UUID who){return readings.containsKey(who);}
     public void message(ServerPlayer p,JsonObject msg) throws IOException {
+        if(transitioning)return;
         String kind=msg.get("kind").getAsString();
         if(kind.equals("image_chunk")){
             if(transitioning||reading(p.getUUID()))return;

@@ -17,7 +17,7 @@ public final class RbdClient {
     private static final Map<String,StringBuilder> chunks=new HashMap<>();
     @SubscribeEvent public static void tick(ClientTickEvent.Post event){ReturnLifecycle.tick();ImmersionOverlay.tick();}
     @SubscribeEvent public static void presented(net.neoforged.neoforge.client.event.RenderFrameEvent.Post e){if(Minecraft.getInstance().screen instanceof MemoryScreen memory)memory.presented();}
-    @SubscribeEvent public static void logout(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut e){chunks.clear();}
+    @SubscribeEvent public static void logout(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut e){chunks.clear();ConnectedClientReturn.clear();dev.rbd.rules.WorldRules.clearClient();}
     public static void send(JsonObject message){PacketDistributor.sendToServer(new MessagePayload(message.toString()));}
     public static void receive(JsonObject msg){
         Minecraft mc=Minecraft.getInstance();
@@ -35,6 +35,10 @@ public final class RbdClient {
             }
             case "compat_test" -> dev.rbd.testing.CompatClient.receive(msg);
             case "transition" -> {ReturnLifecycle.begin(msg);if(mc.screen instanceof MemoryScreen)mc.setScreen(null);}
+            case "world_rules" -> dev.rbd.rules.WorldRules.receive(msg.getAsJsonObject("values"));
+            case "world_reset" -> ConnectedClientReturn.reset();
+            case "transition_complete" -> ConnectedClientReturn.complete();
+            case "transition_fault" -> {ImmersionOverlay.cancel();mc.setScreen(new net.minecraft.client.gui.screens.GenericMessageScreen(net.minecraft.network.chat.Component.translatable("message.rbd.return_paused")));}
             case "return_imprint" -> ImmersionOverlay.imprint(msg.getAsJsonObject("imprint"));
             case "shelf" -> mc.setScreen(new LibraryScreen(msg));
             case "reading" -> mc.setScreen(new MemoryScreen(msg.get("session").getAsString(),msg.get("title").getAsString()));

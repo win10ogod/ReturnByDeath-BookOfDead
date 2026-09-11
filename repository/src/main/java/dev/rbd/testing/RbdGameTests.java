@@ -13,6 +13,40 @@ import java.util.*;
 @PrefixGameTestTemplate(false)
 public final class RbdGameTests {
     @GameTest(template="empty",timeoutTicks=100)
+    public static void interruptedReturnRecoversBeforeWorldLock(GameTestHelper helper) throws Exception {
+        var root=java.nio.file.Files.createTempDirectory("rbd-world-open-");
+        try{
+            var world=java.nio.file.Files.createDirectory(root.resolve("world"));var data=world.resolve("fixture.dat");java.nio.file.Files.writeString(data,"checkpoint");
+            var store=new dev.rbd.io.SnapshotStore(world,dev.rbd.io.SnapshotStore.controlFor(world));store.prepare("CAPTURE",null);store.markClosed();store.complete();
+            java.nio.file.Files.writeString(data,"failed branch");store.prepare("RESTORE",null);store.markClosed();
+            try(var access=net.minecraft.world.level.storage.LevelStorageSource.createDefault(root).createAccess("world")){
+                helper.assertTrue(java.nio.file.Files.readString(data).equals("checkpoint")&&!store.pending(),"normal world opening completes the closed transaction without a supervisor");
+            }
+            store.prepare("CAPTURE",null);boolean refused=false;
+            try(var access=net.minecraft.world.level.storage.LevelStorageSource.createDefault(root).createAccess("world")){}catch(java.io.IOException expected){refused=true;}
+            helper.assertTrue(refused,"a transaction without proof of closed writers is rejected before acquiring a world lock");helper.succeed();
+        }finally{try(var files=java.nio.file.Files.walk(root)){for(var path:files.sorted(java.util.Comparator.reverseOrder()).toList())java.nio.file.Files.deleteIfExists(path);}}
+    }
+    @GameTest(template="empty",timeoutTicks=100)
+    public static void nativeWorldRulesRoundTripWithoutRounding(GameTestHelper helper){
+        var rules=new net.minecraft.world.level.GameRules();
+        var max=(net.minecraft.world.level.GameRules.IntegerValue)rules.getRule((net.minecraft.world.level.GameRules.Key)RbdConfig.MAX_HOLDERS.key());
+        helper.assertTrue(max.tryDeserialize("2147483647"),"unlimited-range holder configuration accepts the complete integer range");
+        helper.assertTrue(!max.tryDeserialize("-1"),"negative holder count rejected by the native editor");
+        var dwell=(net.minecraft.world.level.GameRules.IntegerValue)rules.getRule((net.minecraft.world.level.GameRules.Key)RbdConfig.DEATH_DWELL.key());
+        helper.assertTrue(dwell.tryDeserialize("0.123456789"),"fractional seconds are editable without tick rounding");
+        helper.assertTrue(!dwell.tryDeserialize("NaN")&&!dwell.tryDeserialize("31"),"invalid decimal values rejected");
+        var milestones=(net.minecraft.world.level.GameRules.IntegerValue)rules.getRule((net.minecraft.world.level.GameRules.Key)RbdConfig.MILESTONES.key());
+        helper.assertTrue(milestones.tryDeserialize("minecraft:story/enter_the_nether,twilightforest:progress_naga"),"mod advancement IDs accepted");
+        var copy=rules.copy();var loaded=new net.minecraft.world.level.GameRules(new com.mojang.serialization.Dynamic<>(net.minecraft.nbt.NbtOps.INSTANCE,copy.createTag()));
+        helper.assertTrue(loaded.createTag().equals(rules.createTag()),"all native/custom values survive copy and NBT reload exactly");
+        helper.assertTrue(loaded.createTag().getString(RbdConfig.DEATH_DWELL.key().getId()).equals("0.123456789"),"no fractional precision lost");
+        helper.assertTrue(milestones.tryDeserialize(""),"empty advancement list disables advancement checkpoints");
+        helper.assertTrue(!loaded.createTag().equals(rules.createTag()),"world rule copies are independent");
+        for(var setting:dev.rbd.rules.WorldRules.ALL)helper.assertTrue(loaded.createTag().contains(setting.key().getId()),"configured rule persisted: "+setting.key().getId());
+        helper.succeed();
+    }
+    @GameTest(template="empty",timeoutTicks=100)
     public static void drowningKeepsTerminalBodyEvidence(GameTestHelper helper) throws Exception {
         var victim=helper.spawnWithNoFreeWill(EntityType.VILLAGER,2,1,2);victim.setCustomName(Component.literal("Drowning witness"));victim.setAirSupply(-10);
         victim.hurt(helper.getLevel().damageSources().drown(),Float.MAX_VALUE);

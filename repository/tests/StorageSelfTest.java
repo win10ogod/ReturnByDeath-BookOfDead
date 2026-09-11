@@ -21,15 +21,23 @@ public final class StorageSelfTest {
     static void restore(SnapshotStore s)throws Exception{var death=new JsonObject();death.addProperty("cause","fall");s.prepare("RESTORE",death);s.markClosed();s.complete();}
     static MemoryFrame frame(long tick,String caption,UUID seen){return new MemoryFrame(tick,"minecraft:overworld",1,2,3,0,0,20,caption,seen==null?List.of():List.of(new MemoryFrame.Contact(seen,"Witness","face")),List.of(),"TEST",2,1,new int[]{0xFFABCDEF,0xFF010203},"");}
     public static void main(String[] args)throws Exception{
+        if(args.length==3&&args[0].equals("--restore-migrated")){restore(new SnapshotStore(Path.of(args[1]),Path.of(args[2])));System.out.println("Migrated checkpoint restored with native Java storage");return;}
         root=Files.createTempDirectory("rbd-storage-test-");
         try{
             SnapshotStore s=fresh("roundtrip");JsonObject before=SnapshotStore.inventory(s.world);capture(s);String first=s.active().get("id").getAsString();
             write(s.world,"level.dat","after");write(s.world,"region/new.mca","new");Files.delete(s.world.resolve("data/scoreboard.dat"));restore(s);
             check(SnapshotStore.inventory(s.world).equals(before),"all dimensions, additions, deletions and player data restore");
+            var reordered=before.deepCopy();var dirs=new JsonArray();for(int i=before.getAsJsonArray("directories").size()-1;i>=0;i--)dirs.add(before.getAsJsonArray("directories").get(i));reordered.add("directories",dirs);
+            SnapshotStore.verify(s.world,reordered);check(true,"directory ordering is independent of snapshot writer/platform");
+            dirs.add(dirs.get(0));fails(()->SnapshotStore.verify(s.world,reordered),"duplicate directory metadata rejected");
             check(Files.list(s.control.resolve("failed")).findAny().isPresent(),"failed branch retained");
             check(Files.list(s.control.resolve("returns")).count()==1,"death receipt exactly once");s.complete();check(Files.list(s.control.resolve("returns")).count()==1,"retry does not duplicate death");
             write(s.world,"level.dat","second checkpoint");capture(s);check(s.active().get("ordinal").getAsLong()==2,"monotonic checkpoint");restore(s);check(Files.readString(s.world.resolve("level.dat")).equals("second checkpoint"),"restore newest checkpoint only");
             var corrupt=fresh("corrupt");capture(corrupt);write(corrupt.control.resolve("snapshots").resolve(corrupt.active().get("id").getAsString()).resolve("tree"),"level.dat","corrupt");
+            var configured=fresh("configured");capture(configured);var rules=new JsonObject();rules.addProperty("rbdMaxHolders","3");rules.addProperty("rbdMemoryDeathDwellSeconds","0.123456789");
+            configured.prepare("RESTORE",null,rules);configured.markClosed();configured.complete();
+            check(AtomicJson.read(configured.control.resolve("returned_rules.json")).getAsJsonObject("values").equals(rules),"configuration survives restore without rounding");
+            configured.complete();check(AtomicJson.read(configured.control.resolve("returned_rules.json")).getAsJsonObject("values").equals(rules),"configuration receipt survives recovery retry");
             fails(()->restore(corrupt),"corrupt snapshot must be refused");check(corrupt.pending(),"failed transaction retained");check(Files.readString(corrupt.world.resolve("level.dat")).equals("before"),"live world untouched on bad checksum");
             var unclosed=fresh("unclosed");unclosed.prepare("CAPTURE",null);fails(unclosed::complete,"no normal close proof must refuse");
             var locked=fresh("locked");locked.prepare("CAPTURE",null);locked.markClosed();

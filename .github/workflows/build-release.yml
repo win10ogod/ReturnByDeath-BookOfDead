@@ -29,9 +29,12 @@ jobs:
       - name: Compile and run Java and NeoForge tests
         working-directory: repository
         run: bash gradlew --no-daemon build runGameTestServer
-      - name: Test offline supervisor
-        working-directory: repository/supervisor
-        run: python -m unittest -v test_supervisor
+      - name: Test supervisor and migration to connected returns
+        working-directory: repository
+        run: |
+          bash tools/test_storage.sh
+          gson_jar=$(rg --files "$HOME/.gradle/caches/modules-2/files-2.1/com.google.code.gson/gson" -g 'gson-2.10.1.jar' | head -n 1)
+          RBD_MIGRATION_CLASSPATH="$PWD/build/storage-tests:$gson_jar" python -m unittest discover -s supervisor -v
       - name: Package JAR, sources and checksums
         run: python tools/ci_artifacts.py
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

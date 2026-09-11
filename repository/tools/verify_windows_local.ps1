@@ -16,6 +16,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Authority model failed' }
     python tools/test_lock_interop.py --java java --classes build/storage-tests-windows
     if ($LASTEXITCODE -ne 0) { throw "Java/Python lock interoperability failed" }
+    $previousMigrationClasspath = $env:RBD_MIGRATION_CLASSPATH
+    $env:RBD_MIGRATION_CLASSPATH = (Resolve-Path build/storage-tests-windows).Path + ';' + $GsonJar
     Push-Location supervisor
-    try { python -m unittest -v test_supervisor; if ($LASTEXITCODE -ne 0) { throw 'Supervisor tests failed' } } finally { Pop-Location }
+    try { python -m unittest -v test_supervisor test_migration; if ($LASTEXITCODE -ne 0) { throw 'Supervisor/migration tests failed' } }
+    finally { Pop-Location; $env:RBD_MIGRATION_CLASSPATH = $previousMigrationClasspath }
 } finally { Pop-Location }

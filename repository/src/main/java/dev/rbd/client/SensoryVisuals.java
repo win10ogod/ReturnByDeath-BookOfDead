@@ -7,8 +7,8 @@ import net.minecraft.client.gui.GuiGraphics;
 /** Continuous peripheral shading. No strobe, camera displacement, fabricated attacker or HUD meter. */
 public final class SensoryVisuals {
     public static void body(GuiGraphics g,int w,int h,MortalExperience.Profile p,double seconds,float closing){
-        if(ImmersionConfig.REDUCED.get())return;
-        float strength=ImmersionConfig.VISUAL.get().floatValue();
+        if(ImmersionConfig.reduced())return;
+        float strength=(float)ImmersionConfig.visual();
         float pulse=(float)((1-Math.cos(seconds*(3.2+p.stress()*4)))*0.5)*0.055F*p.stress();
         float edge=(0.12F+p.stress()*0.20F+closing*0.50F+pulse)*strength;
         int tint=switch(p.kind()){

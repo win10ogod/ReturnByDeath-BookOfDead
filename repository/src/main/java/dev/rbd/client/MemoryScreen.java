@@ -30,7 +30,7 @@ public final class MemoryScreen extends Screen {
     public void frame(MemoryFrame next,long sequence,double dwell) throws java.io.IOException {
         this.sequence=sequence;this.dwell=dwell;frameStarted=System.nanoTime();acknowledge=true;frame=next;
         profile=MortalExperience.profile(next.health(),next.body());
-        if(!next.caption().isBlank()){caption=next.caption();captionLife=100;}
+        if(!next.caption().isBlank()){caption=next.caption();captionLife=dev.rbd.RbdConfig.CAPTION_TICKS.get();}
         if(next.pixels().length>0||(next.png()!=null&&!next.png().isEmpty())){
             clientImage=next.png()!=null&&!next.png().isEmpty();NativeImage pixels;
             if(clientImage)pixels=NativeImage.read(new java.io.ByteArrayInputStream(java.util.Base64.getDecoder().decode(next.png())));
@@ -47,28 +47,32 @@ public final class MemoryScreen extends Screen {
     }
     private double elapsed(){return (System.nanoTime()-frameStarted)/1_000_000_000.0;}
     public void presented(){
-        if(acknowledge&&frame!=null&&(System.nanoTime()-entered)>=600_000_000L&&(!profile.terminal()||elapsed()>=dwell)){
+        if(acknowledge&&frame!=null&&(System.nanoTime()-entered)>=dev.rbd.RbdConfig.READ_FADE.get()*1_000_000_000L&&(!profile.terminal()||elapsed()>=dwell)){
             var ack=RbdNetwork.message("experienced");ack.addProperty("session",session);ack.addProperty("sequence",sequence);RbdClient.send(ack);acknowledge=false;
         }
     }
     public boolean hasClientImage(){return clientImage;}
     public long sequence(){return sequence;}
     public boolean experiencingDeath(){return profile.terminal();}
-    public boolean deathIsSilent(){return profile.terminal()&&MortalExperience.ending(elapsed(),dwell,ImmersionConfig.REDUCED.get()).silent();}
+    public boolean deathIsSilent(){return profile.terminal()&&MortalExperience.ending(elapsed(),dwell,ImmersionConfig.reduced()).silent();}
     public double deathElapsed(){return profile.terminal()?elapsed():0;}
     public void completed(){Minecraft.getInstance().setScreen(null);ImmersionOverlay.afterReading(profile);}
     @Override public boolean isPauseScreen(){return false;}
     @Override public void tick(){
+        if(dev.rbd.RbdConfig.READ_LOCK.get())movementKeys().forEach(key->key.setDown(false));
         if(captionLife>0)captionLife--;
-        float audible=profile.terminal()?MortalExperience.ending(elapsed(),dwell,ImmersionConfig.REDUCED.get()).audible():1;
+        float audible=profile.terminal()?MortalExperience.ending(elapsed(),dwell,ImmersionConfig.reduced()).audible():1;
         ExperienceAudio.tick(profile,audible);
     }
     @Override public void onClose(){RbdClient.send(RbdNetwork.message("close"));super.onClose();}
-    @Override public void removed(){if(texture!=null){Minecraft.getInstance().getTextureManager().release(location);texture=null;}ExperienceAudio.leaveReading();}
+    @Override public void removed(){movementKeys().forEach(key->key.setDown(false));if(texture!=null){Minecraft.getInstance().getTextureManager().release(location);texture=null;}ExperienceAudio.leaveReading();}
     @Override public boolean keyPressed(int key,int scan,int modifiers){
         if(key==GLFW.GLFW_KEY_F8){ImmersionConfig.REDUCED.set(!ImmersionConfig.REDUCED.get());ImmersionConfig.SPEC.save();return true;}
+        if(!dev.rbd.RbdConfig.READ_LOCK.get())for(var mapping:movementKeys())if(mapping.matches(key,scan)){mapping.setDown(true);return true;}
         return super.keyPressed(key,scan,modifiers);
     }
+    @Override public boolean keyReleased(int key,int scan,int modifiers){for(var mapping:movementKeys())if(mapping.matches(key,scan)){mapping.setDown(false);return true;}return super.keyReleased(key,scan,modifiers);}
+    private static java.util.List<KeyMapping> movementKeys(){var o=Minecraft.getInstance().options;return java.util.List.of(o.keyUp,o.keyDown,o.keyLeft,o.keyRight,o.keyJump,o.keyShift,o.keySprint);}
     @Override public void render(GuiGraphics g,int mouseX,int mouseY,float partial){
         g.fill(0,0,width,height,0xFF030306);
         if(texture!=null){
@@ -77,12 +81,12 @@ public final class MemoryScreen extends Screen {
         }
         double sinceEntry=(System.nanoTime()-entered)/1_000_000_000.0;
         g.flush();g.pose().pushPose();g.pose().translate(0,0,400);
-        var ending=profile.terminal()?MortalExperience.ending(elapsed(),dwell,ImmersionConfig.REDUCED.get()):new MortalExperience.Ending(0,0,1,false,false);
+        var ending=profile.terminal()?MortalExperience.ending(elapsed(),dwell,ImmersionConfig.reduced()):new MortalExperience.Ending(0,0,1,false,false);
         SensoryVisuals.body(g,width,height,profile,sinceEntry,ending.closing());
-        SensoryVisuals.darkness(g,width,height,Math.max(ending.darkness(),1-MortalExperience.smooth((float)(sinceEntry/0.6))));
+        SensoryVisuals.darkness(g,width,height,Math.max(ending.darkness(),dev.rbd.RbdConfig.READ_FADE.get()==0?0:1-MortalExperience.smooth((float)(sinceEntry/dev.rbd.RbdConfig.READ_FADE.get()))));
         // Identity fades into the lived scene; no permanent video title, death counter or retry prompt.
-        if(sinceEntry<3&&!profile.terminal()){
-            int alpha=(int)(255*MortalExperience.unit((float)(3-sinceEntry)));
+        if(sinceEntry<dev.rbd.RbdConfig.READ_TITLE.get()&&!profile.terminal()){
+            int alpha=(int)(255*MortalExperience.unit((float)(dev.rbd.RbdConfig.READ_TITLE.get()-sinceEntry)));
             if(alpha>4)g.drawString(font,title,12,12,(alpha<<24)|0xE8D6B2,false);
         }
         if(profile.terminal()&&!ending.silent()){

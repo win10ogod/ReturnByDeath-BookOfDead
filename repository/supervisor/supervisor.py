@@ -76,7 +76,7 @@ def file_hash(path: Path) -> str:
         for chunk in iter(lambda: f.read(1024 * 1024), b''): h.update(chunk)
     return h.hexdigest()
 
-def inventory(root: Path) -> dict[str, Any]:
+def inventory(root: Path, *, excluded_root_files: frozenset[str] = frozenset({'session.lock'})) -> dict[str, Any]:
     """Byte-level saved-files inventory; NOT a semantic NBT/RNG correctness proof."""
     if is_link(root) or not root.is_dir(): raise SafetyError(f'Invalid world tree: {root}')
     files: dict[str, Any] = {}; directories: list[str] = []
@@ -87,24 +87,24 @@ def inventory(root: Path) -> dict[str, Any]:
             directories.append(p.relative_to(root).as_posix())
         for name in sorted(names):
             p = Path(base) / name
-            if p.relative_to(root).as_posix() == 'session.lock': continue
+            if p.relative_to(root).as_posix() in excluded_root_files: continue
             st = p.lstat()
             if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1:
                 raise SafetyError(f'Non-regular file or hardlink rejected: {p}')
             files[p.relative_to(root).as_posix()] = {'size': st.st_size, 'sha256': file_hash(p)}
     return {'files': files, 'directories': sorted(directories)}
 
-def copy_tree(source: Path, target: Path) -> dict[str, Any]:
+def copy_tree(source: Path, target: Path, *, excluded_root_files: frozenset[str] = frozenset({'session.lock'})) -> dict[str, Any]:
     if target.exists(): raise SafetyError(f'Never overwrite an existing staged tree: {target}')
-    before = inventory(source)
+    before = inventory(source, excluded_root_files=excluded_root_files)
     def ignore(base: str, names: list[str]) -> list[str]:
-        return ['session.lock'] if Path(base) == source and 'session.lock' in names else []
+        return [name for name in names if name in excluded_root_files] if Path(base) == source else []
     shutil.copytree(source, target, ignore=ignore, copy_function=shutil.copy2)
     for base, _, names in os.walk(target, topdown=False):
         for name in names:
             with (Path(base) / name).open('r+b') as f: os.fsync(f.fileno())
         sync_dir(Path(base))
-    if inventory(target) != before or inventory(source) != before:
+    if inventory(target, excluded_root_files=excluded_root_files) != before or inventory(source, excluded_root_files=excluded_root_files) != before:
         raise SafetyError('World changed while copying or copy verification failed')
     return before
 

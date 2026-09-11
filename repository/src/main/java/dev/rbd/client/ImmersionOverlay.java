@@ -34,6 +34,7 @@ public final class ImmersionOverlay {
         if(separated)awaitingLogin=false;
     }
     public static boolean isSeparated(){return separated;}
+    public static void connectedReady(){awaitingLogin=false;}
     public static boolean isBlack(){return separated&&(System.nanoTime()-departed)>2_700_000_000L;}
     public static void cancel(){separated=false;releaseView();}
     public static void afterReading(MortalExperience.Profile profile){
@@ -45,25 +46,25 @@ public final class ImmersionOverlay {
             double age=(now-departed)/1_000_000_000.0;
             // Long disk work or a failed connection must remain diagnosable; this only removes the veil.
             if(age>30&&(mc.screen instanceof DisconnectedScreen||mc.screen instanceof AlertScreen||mc.screen instanceof TitleScreen)){cancel();return;}
-            var ending=MortalExperience.ending(age,4,ImmersionConfig.REDUCED.get());ExperienceAudio.tick(loss,ending.audible());
-            boolean playable=mc.level!=null&&mc.player!=null&&mc.screen==null&&mc.getOverlay()==null;
-            if((integrated&&!awaitingLogin&&playable&&age>=4)||(!integrated&&age>=4)){
+            var ending=MortalExperience.ending(age,dev.rbd.RbdConfig.RETURN_DWELL.get(),ImmersionConfig.reduced());ExperienceAudio.tick(loss,ending.audible());
+            boolean playable=mc.level!=null&&mc.player!=null&&mc.getOverlay()==null&&!(mc.screen instanceof ReceivingLevelScreen)&&!(mc.screen instanceof ProgressScreen)&&!(mc.screen instanceof GenericMessageScreen)&&!(mc.screen instanceof TitleScreen)&&!(mc.screen instanceof DisconnectedScreen)&&!(mc.screen instanceof AlertScreen);
+            if((integrated&&!awaitingLogin&&playable&&age>=dev.rbd.RbdConfig.RETURN_DWELL.get())||(!integrated&&age>=dev.rbd.RbdConfig.RETURN_DWELL.get())){
                 separated=false;releaseView();awakened=now;after=loss;afterStarted=now;
                 ExperienceAudio.resetBodyClock();ExperienceAudio.cue("body.gasp",0.32F,1);
             }
             return;
         }
         if(mc.level==null||mc.player==null||mc.screen instanceof MemoryScreen)return;
-        if(afterStarted>0&&(now-afterStarted)<5_000_000_000L){
-            float remaining=1-(now-afterStarted)/5_000_000_000F;
+        if(afterStarted>0&&(now-afterStarted)<dev.rbd.RbdConfig.ECHO_SECONDS.get()*1_000_000_000L){
+            float remaining=1-(float)((now-afterStarted)/(dev.rbd.RbdConfig.ECHO_SECONDS.get()*1_000_000_000.0));
             ExperienceAudio.tick(new MortalExperience.Profile(after.kind(),after.stress()*remaining,after.breathlessness()*remaining,false),0.6F*remaining);
         }
-        if(!ImmersionConfig.ECHOES.get()||imprint==null||siteRecalled||now-awakened<10_000_000_000L)return;
+        if(!ImmersionConfig.echoes()||imprint==null||siteRecalled||now-awakened<dev.rbd.RbdConfig.ECHO_COOLDOWN.get()*1_000_000_000L)return;
         if(!mc.level.dimension().location().toString().equals(imprint.get("dimension").getAsString()))return;
         double x=imprint.get("x").getAsDouble(),y=imprint.get("y").getAsDouble(),z=imprint.get("z").getAsDouble();
         // Close range and actual line of sight, so this cannot become a through-wall death-site radar.
         var eye=mc.player.getEyePosition();var remembered=new net.minecraft.world.phys.Vec3(x,y+1,z);
-        if(eye.distanceToSqr(remembered)>25)return;
+        if(eye.distanceToSqr(remembered)>Math.pow(dev.rbd.RbdConfig.ECHO_RANGE.get(),2))return;
         var obstruction=mc.level.clip(new net.minecraft.world.level.ClipContext(eye,remembered,net.minecraft.world.level.ClipContext.Block.VISUAL,net.minecraft.world.level.ClipContext.Fluid.NONE,mc.player));
         if(obstruction.getType()!=net.minecraft.world.phys.HitResult.Type.MISS&&obstruction.getLocation().distanceToSqr(remembered)>1)return;
         siteRecalled=true;after=MortalExperience.profile(0,MemoryArchive.GSON.fromJson(imprint.get("body"),SomaticState.class));afterStarted=now;
@@ -72,7 +73,7 @@ public final class ImmersionOverlay {
         var mc=Minecraft.getInstance();int w=mc.getWindow().getGuiScaledWidth(),h=mc.getWindow().getGuiScaledHeight();
         if(separated){
             double age=(System.nanoTime()-departed)/1_000_000_000.0;
-            var ending=MortalExperience.ending(age,4,ImmersionConfig.REDUCED.get());
+            var ending=MortalExperience.ending(age,dev.rbd.RbdConfig.RETURN_DWELL.get(),ImmersionConfig.reduced());
             g.fill(0,0,w,h,0xFF020204);
             if(lastView!=null&&!ending.silent()){
                 int iw=lastView.getPixels().getWidth(),ih=lastView.getPixels().getHeight();g.blit(lastLocation,0,0,w,h,0,0,iw,ih,iw,ih);
@@ -82,8 +83,8 @@ public final class ImmersionOverlay {
         }
         if(mc.level==null||mc.screen instanceof MemoryScreen||afterStarted==0)return;
         double age=(System.nanoTime()-afterStarted)/1_000_000_000.0;
-        if(age<5&&ImmersionConfig.ECHOES.get()){
-            float remaining=(float)(1-age/5);var echo=new MortalExperience.Profile(after.kind(),after.stress()*remaining,after.breathlessness()*remaining,false);
+        if(age<dev.rbd.RbdConfig.ECHO_SECONDS.get()&&ImmersionConfig.echoes()){
+            float remaining=(float)(1-age/dev.rbd.RbdConfig.ECHO_SECONDS.get());var echo=new MortalExperience.Profile(after.kind(),after.stress()*remaining,after.breathlessness()*remaining,false);
             SensoryVisuals.body(g,w,h,echo,age,0);
         }
     }

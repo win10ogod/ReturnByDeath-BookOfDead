@@ -8,6 +8,11 @@ public final class ReturnLifecycle {
     private static volatile String readyWorld,error;
     private static boolean waiting;
     public static void begin(com.google.gson.JsonObject message){
+        if(message.has("connected")&&message.get("connected").getAsBoolean()){
+            ConnectedClientReturn.begin();
+            if(message.has("ending"))ImmersionOverlay.departing(dev.rbd.memory.MemoryArchive.GSON.fromJson(message.get("ending"),dev.rbd.memory.SomaticState.class),true);
+            return;
+        }
         waiting=Minecraft.getInstance().hasSingleplayerServer();
         if(message.get("operation").getAsString().equals("RESTORE")&&message.has("ending"))ImmersionOverlay.departing(dev.rbd.memory.MemoryArchive.GSON.fromJson(message.get("ending"),dev.rbd.memory.SomaticState.class),waiting);
     }

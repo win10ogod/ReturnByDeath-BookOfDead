@@ -4,11 +4,31 @@
   "package": "dev.rbd.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "ReadingInputMixin"
+    "ReadingInputMixin",
+    "ServerWorldAccess",
+    "PlayerListAccess",
+    "CommonConnectionAccess",
+    "ConnectedServerMixin",
+    "ConnectedPlayerMixin",
+    "PlayConnectionAccess",
+    "GameRuleTypeAccess",
+    "GameRulesDefaultsMixin",
+    "ConnectedJoinMixin",
+    "PausedCommandMixin",
+    "ConfigurationConnectionAccess",
+    "WorldRecoveryMixin"
   ],
   "client": [
     "WorldOpenMixin",
-    "ImmersionRenderMixin"
+    "ImmersionRenderMixin",
+    "StatsAccess",
+    "ConnectedClientMixin",
+    "ClientMapAccess",
+    "TextRuleEntryMixin",
+    "PausedClientWorldMixin",
+    "PausedClientInputMixin",
+    "EditExistingWorldMixin",
+    "ConnectedIntegratedMixin"
   ],
   "injectors": {
     "defaultRequire": 1

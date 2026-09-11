@@ -15,5 +15,9 @@ public final class ImmersionConfig {
         AUDIO=b.comment("Volume multiplier for original body-sensation cues. Minecraft master/player volume remains effective.").defineInRange("bodySoundIntensity",0.65,0,1);
         SPEC=b.build();
     }
+    public static boolean reduced(){return REDUCED.get()||RbdConfig.REDUCED_EFFECTS.get();}
+    public static boolean echoes(){return ECHOES.get()&&RbdConfig.RETURN_ECHOES.get();}
+    public static double visual(){return VISUAL.get()!=0.8?VISUAL.get():RbdConfig.VISUAL_INTENSITY.get();}
+    public static double audio(){return AUDIO.get()!=0.65?AUDIO.get():RbdConfig.AUDIO_INTENSITY.get();}
     private ImmersionConfig(){}
 }

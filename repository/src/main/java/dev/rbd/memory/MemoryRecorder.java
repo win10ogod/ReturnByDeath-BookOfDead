@@ -43,13 +43,13 @@ public final class MemoryRecorder implements AutoCloseable {
         t.segment.append(new MemoryFrame(e.level().getGameTime(),e.level().dimension().location().toString(),e.getX(),e.getEyeY(),e.getZ(),e.getYRot(),e.getXRot(),e.getHealth(),t.caption,List.copyOf(contacts),List.copyOf(t.sounds),source,w,h,pixels,png,body));
         t.damage=0;
         t.caption="";t.sounds.clear();
-        if(t.segment.count()>=200){seal(e.getUUID());track(e);}
+        if(t.segment.count()>=RbdConfig.SEGMENT_FRAMES.get()){seal(e.getUUID());track(e);}
     }
     public void experienced(ServerPlayer reader,MemoryFrame frame) throws IOException {
         Track t=track(reader);
         t.segment.append(new MemoryFrame(reader.level().getGameTime(),frame.dimension(),frame.x(),frame.y(),frame.z(),frame.yaw(),frame.pitch(),frame.health(),frame.caption(),frame.contacts(),frame.sounds(),"EXPERIENCED_MEMORY/"+frame.visualSource(),frame.width(),frame.height(),frame.pixels(),frame.png(),frame.body()==null?null:frame.body().asExperience()));
         t.caption="";t.sounds.clear();
-        if(t.segment.count()>=200){seal(reader.getUUID());track(reader);}
+        if(t.segment.count()>=RbdConfig.SEGMENT_FRAMES.get()){seal(reader.getUUID());track(reader);}
     }
     public void clearImage(UUID id){Track t=tracks.get(id);if(t!=null){t.png="";t.imageTick=Long.MIN_VALUE;}}
     public void image(ServerPlayer actor,int width,int height,String png) throws IOException {
@@ -60,8 +60,9 @@ public final class MemoryRecorder implements AutoCloseable {
     public void caption(LivingEntity e,String caption) throws IOException {if(!game.reading(e.getUUID()))track(e).caption+=caption+"\n";}
     public void hurt(LivingEntity e,String type,float damage) throws IOException {Track t=track(e);t.damageType=type;t.damage+=damage;}
     public void sound(ServerLevel level,net.minecraft.world.phys.Vec3 pos,String sound,float volume,float pitch){
-        for(Track t:tracks.values())if(!game.reading(t.actor.getUUID())&&t.actor.level()==level&&t.actor.position().distanceTo(pos)<=Math.max(16,volume*16))
-            t.sounds.add(new MemoryFrame.Sound(sound,Math.max(0,volume*(1-(float)t.actor.position().distanceTo(pos)/Math.max(16,volume*16))),pitch));
+        if(!RbdConfig.RECORD_SOUNDS.get()||game.transitioning)return;
+        for(Track t:tracks.values())if(!game.reading(t.actor.getUUID())&&t.actor.level()==level&&t.actor.position().distanceTo(pos)<=Math.max(RbdConfig.SOUND_RANGE.get(),volume*RbdConfig.SOUND_RANGE.get()))
+            t.sounds.add(new MemoryFrame.Sound(sound,(float)Math.max(0,volume*(1-t.actor.position().distanceTo(pos)/Math.max(RbdConfig.SOUND_RANGE.get(),volume*RbdConfig.SOUND_RANGE.get()))),pitch));
     }
     public String seal(UUID id) throws IOException {
         Track t=tracks.remove(id);var heads=game.branch.object("heads");

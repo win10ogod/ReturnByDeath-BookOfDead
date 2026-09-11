@@ -10,7 +10,7 @@ import java.util.*;
 import static java.nio.file.StandardCopyOption.*;
 import static java.nio.file.StandardOpenOption.*;
 
-/** Offline snapshots. The caller must have joined the server thread before invoking a transaction. */
+/** Verified snapshots. Every world writer and storage handle must be closed before a transaction; the network may remain alive. */
 public final class SnapshotStore {
     public final Path world, control;
     public SnapshotStore(Path world, Path control) throws IOException {
@@ -29,6 +29,9 @@ public final class SnapshotStore {
         return Files.exists(file) ? AtomicJson.read(file) : null;
     }
     public void prepare(String operation, JsonObject death) throws IOException {
+        prepare(operation,death,null);
+    }
+    public void prepare(String operation, JsonObject death, JsonObject worldRules) throws IOException {
         if (Files.exists(control.resolve("transaction.json"))) throw new IOException("Unresolved return transaction");
         JsonObject tx = new JsonObject();
         tx.addProperty("id", UUID.randomUUID().toString());
@@ -39,6 +42,7 @@ public final class SnapshotStore {
         tx.addProperty("checkpoint", active == null ? "" : active.get("id").getAsString());
         tx.addProperty("ordinal", active == null ? 1 : active.get("ordinal").getAsLong() + 1);
         if (death != null) tx.add("death", death);
+        if (worldRules != null) tx.add("worldRules",worldRules.deepCopy());
         AtomicJson.write(control.resolve("transaction.json"), tx);
     }
     public boolean pending() { return Files.exists(control.resolve("transaction.json")); }
@@ -58,6 +62,10 @@ public final class SnapshotStore {
             if (tx.get("operation").getAsString().equals("CAPTURE")) capture(tx, id);
             else if (tx.get("operation").getAsString().equals("RESTORE")) restore(tx, id);
             else throw new IOException("Unknown transaction operation");
+            if(tx.has("worldRules")){
+                JsonObject rules=new JsonObject();rules.addProperty("id",id);rules.add("values",tx.get("worldRules"));
+                AtomicJson.write(control.resolve("returned_rules.json"),rules);
+            }
             AtomicJson.write(control.resolve("receipts").resolve(id + ".json"), tx);
             Files.delete(control.resolve("transaction.json"));
         } catch (OverlappingFileLockException e) { throw new IOException("Return transaction already running", e); }
@@ -155,7 +163,17 @@ public final class SnapshotStore {
         verify(source, before); verify(target, before); return before;
     }
     public static void verify(Path root, JsonObject manifest) throws IOException {
-        if (!inventory(root).equals(manifest)) throw new IOException("Snapshot checksum mismatch: " + root);
+        JsonObject actual=inventory(root);
+        // Directory enumeration order differs between Windows, POSIX and the legacy Python writer.
+        // File paths, sizes and every byte's hash still require exact equality.
+        if(!actual.get("files").equals(manifest.get("files"))||!directorySet(actual).equals(directorySet(manifest)))
+            throw new IOException("Snapshot checksum mismatch: " + root);
+    }
+    private static Set<String> directorySet(JsonObject manifest) throws IOException {
+        if(!manifest.has("directories")||!manifest.get("directories").isJsonArray())throw new IOException("Invalid snapshot directories");
+        Set<String> values=new HashSet<>();
+        for(var entry:manifest.getAsJsonArray("directories"))if(!entry.isJsonPrimitive()||!values.add(entry.getAsString()))throw new IOException("Invalid or duplicate snapshot directory");
+        return values;
     }
     public static String hash(Path path) throws IOException {
         try {

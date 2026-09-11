@@ -28,15 +28,21 @@ import static dev.rbd.testing.CompatChecks.*;
 @EventBusSubscriber(modid="rbd")
 public final class CompatScenario {
     public static final boolean ENABLED=Boolean.getBoolean("rbd.compatTest");
-    private static final String SESSION=UUID.randomUUID().toString();
+    private static String SESSION=UUID.randomUUID().toString();
     private static JsonObject state;
     private static int wait;
+    private static GameSession observedGame;
+    private static final Map<UUID,Object> connections=new HashMap<>();
+    private static final Map<UUID,Integer> logins=new HashMap<>();
+    public static boolean connected(){return Boolean.getBoolean("rbd.connectedTest");}
+    private static String checkpoint(GameSession g) throws Exception {return g.supervisor==null?g.snapshots.active().get("id").getAsString():g.supervisor.active().get("checkpoint_id").getAsString();}
     private static boolean failed;
     private static final String TF_ADV="twilightforest:progress_naga";
     public static Path root(){return Path.of(System.getProperty("rbd.testRoot")).toAbsolutePath();}
     public static boolean allowed(){return ENABLED&&System.getProperty("rbd.testRoot")!=null&&Files.isRegularFile(root().resolve(".rbd-test-fixture"));}
     @SubscribeEvent public static void login(PlayerEvent.PlayerLoggedInEvent event){
-        if(!allowed()||!(event.getEntity() instanceof ServerPlayer p)||!p.getGameProfile().getName().matches("Rbd[ABC]"))return;
+        if(!allowed()||!(event.getEntity() instanceof ServerPlayer p)||!p.getGameProfile().getName().matches("Rbd[ABCD]"))return;
+        logins.merge(p.getUUID(),1,Integer::sum);connections.putIfAbsent(p.getUUID(),p.connection);
         var msg=RbdNetwork.message("compat_test");msg.addProperty("session",SESSION);RbdNetwork.send(p,msg);
     }
     private static void save(int stage) throws Exception {state.addProperty("stage",stage);AtomicJson.write(root().resolve("scenario.json"),state);}
@@ -52,6 +58,7 @@ public final class CompatScenario {
         var tf=g.server.getLevel(TWILIGHT);tf.setBlockAndUpdate(MARKER,BuiltInRegistries.BLOCK.get(ResourceLocation.parse("twilightforest:mazestone")).defaultBlockState());
         g.server.overworld().setBlockAndUpdate(new BlockPos(2,200,0),Blocks.GOLD_BLOCK.defaultBlockState());
         for(ServerPlayer p:List.of(a,b,c)){
+            p.awardStat(net.minecraft.stats.Stats.FISH_CAUGHT,9);p.getStats().sendStats(p);g.server.getRecipeManager().byKey(ResourceLocation.parse("minecraft:netherite_sword_smithing")).ifPresent(recipe->p.awardRecipes(List.of(recipe)));
             p.getInventory().add(new ItemStack(item("kamenridercraft:rider_pass"),3));p.giveExperienceLevels(9);p.setData(riderAttachment(),false);
         }
         advancement(b,TF_ADV,true);
@@ -61,7 +68,12 @@ public final class CompatScenario {
         UUID mob=UUID.fromString(state.get("boss").getAsString());var boss=tf.getEntity(mob);require(boss instanceof LivingEntity,"Twilight boss exists before branch death");
         ((LivingEntity)boss).hurt(tf.damageSources().genericKill(),Float.MAX_VALUE);
     }
+    private static void resource(GameSession g) throws Exception {
+        try(var stream=g.server.getResourceManager().getResource(ResourceLocation.parse("rbd_fixture:probe.txt")).orElseThrow().open()){require(new String(stream.readAllBytes(),java.nio.charset.StandardCharsets.UTF_8).equals("checkpoint resource"),"zipped world data-pack resources remain available after return");}
+    }
     private static void restored(GameSession g,ServerPlayer a,ServerPlayer b,ServerPlayer c) throws Exception {
+        resource(g);
+        if(state.has("worldRuleEdited"))require(RbdConfig.ECHO_SECONDS.get()==7.25,"game-rule changes survive world returns");
         var tf=g.server.getLevel(TWILIGHT);
         require(tf.getBlockState(MARKER).is(BuiltInRegistries.BLOCK.get(ResourceLocation.parse("twilightforest:twilight_oak_log"))),"Twilight mod block restored");
         require(g.server.overworld().getBlockState(new BlockPos(2,200,0)).is(Blocks.DIAMOND_BLOCK),"overworld restored with Twilight");
@@ -76,6 +88,7 @@ public final class CompatScenario {
             require(p.getData(riderAttachment()),"KRC serialized attachment restored for every player");
             require(p.getHealth()==8,"injured checkpoint body restored for every player");
         }
+        require(c.isPassenger()&&c.getVehicle().getUUID().toString().equals(state.get("mount").getAsString()),"checkpoint player mount restored without duplicate entity UUIDs");
         require(g.holders().size()==2&&g.isHolder(a.getUUID())&&g.isHolder(b.getUUID())&&!g.isHolder(c.getUUID()),"configured membership survives whole-world return");
     }
     private static void kill(ServerPlayer p){p.setInvulnerable(false);p.removeAllEffects();p.invulnerableTime=0;p.hurt(p.damageSources().genericKill(),Float.MAX_VALUE);}
@@ -83,6 +96,7 @@ public final class CompatScenario {
         if(!allowed()||failed)return;var g=GameSession.current;
         if(g==null||g.transitioning||g.returnPending()||!g.server.isDedicatedServer()||!g.snapshots.world.getParent().equals(root().resolve("server")))return;
         try {
+            if(connected()&&observedGame!=g){observedGame=g;SESSION=UUID.randomUUID().toString();for(ServerPlayer player:g.server.getPlayerList().getPlayers()){require(connections.get(player.getUUID())==player.connection,"same play listener survives return");require(logins.get(player.getUUID())==1,"only one server login per player");var msg=RbdNetwork.message("compat_test");msg.addProperty("session",SESSION);RbdNetwork.send(player,msg);}}
             if(state==null)state=Files.exists(root().resolve("scenario.json"))?AtomicJson.read(root().resolve("scenario.json")):new JsonObject();
             int stage=state.has("stage")?state.get("stage").getAsInt():0;
             if(stage==99){g.server.halt(false);return;}
@@ -91,11 +105,13 @@ public final class CompatScenario {
             if(wait++<60)return;wait=0;
             if(stage==0){
                 for(String id:List.of("kamenridercraft","twilightforest","geckolib","player_animation_library"))require(ModList.get().isLoaded(id),"required real mod loaded: "+id);
+                resource(g);
                 require(RbdConfig.MAX_HOLDERS.get()==2,"fixture uses actual maxHolders configuration");g.bind(a);g.bind(b);
                 boolean limit=false;try{g.bind(c);}catch(IllegalStateException expected){limit=true;}require(limit,"third grant rejected by configured limit");
                 var tf=g.server.getLevel(TWILIGHT);require(tf!=null,"Twilight dimension registered");
                 for(ServerLevel level:g.server.getAllLevels()){level.getGameRules().getRule(GameRules.RULE_NATURAL_REGENERATION).set(false,g.server);level.getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING).set(false,g.server);}
                 position(a,g.server.overworld(),0);position(b,tf,0);position(c,g.server.overworld(),10);
+                var boat=net.minecraft.world.entity.EntityType.BOAT.create(g.server.overworld());boat.moveTo(c.getX(),c.getY(),c.getZ(),0,0);boat.setNoGravity(true);boat.setInvulnerable(true);g.server.overworld().addFreshEntity(boat);require(c.startRiding(boat,true),"fixture player mounted at checkpoint");state.addProperty("mount",boat.getUUID().toString());
                 g.server.overworld().setBlockAndUpdate(new BlockPos(2,200,0),Blocks.DIAMOND_BLOCK.defaultBlockState());
                 tf.setBlockAndUpdate(MARKER,BuiltInRegistries.BLOCK.get(ResourceLocation.parse("twilightforest:twilight_oak_log")).defaultBlockState());
                 // Move the reader away from the marker after making the real dimension fixture.
@@ -109,17 +125,19 @@ public final class CompatScenario {
                 g.learn(a.getUUID(),contact(b.getUUID(),"RbdB"));g.learn(b.getUUID(),contact(a.getUUID(),"RbdA"));
                 state.addProperty("a",a.getUUID().toString());state.addProperty("b",b.getUUID().toString());state.addProperty("c",c.getUUID().toString());save(1);
             }else if(stage==1){
-                restored(g,a,b,c);state.addProperty("checkpoint",g.supervisor.active().get("checkpoint_id").getAsString());
+                if(Boolean.getBoolean("rbd.membershipTest")){var d=g.server.getPlayerList().getPlayerByName("RbdD");if(d==null||!ready("RbdD"))return;state.addProperty("latePlayer",d.getUUID().toString());}
+                restored(g,a,b,c);state.addProperty("checkpoint",checkpoint(g));
                 // A further grant and removal do not manufacture a later checkpoint.
                 g.unbind(b.getUUID());g.bind(b);require(g.queuedMilestone==null,"regrant creates no checkpoint");
                 charm(g,b);b.setHealth(8);b.setInvulnerable(true);
+                if(connected()){g.server.getCommands().performPrefixedCommand(g.server.createCommandSourceStack(),"gamerule rbdReturnEchoSeconds 7.25");require(RbdConfig.ECHO_SECONDS.get()==7.25,"native gamerule command changes active world settings");state.addProperty("worldRuleEdited",true);}
                 UUID secret=UUID.randomUUID();state.addProperty("secret",secret.toString());g.learn(a.getUUID(),contact(secret,"A alone remembers"));
                 require(!g.recognizes(b.getUUID(),secret),"holders have distinct knowledge");
                 g.recorder.caption(a,"SURVIVOR_BRANCH_EXPERIENCE");g.recorder.record(a,false);
                 mutate(g,a,b,c);kill(c);require(!g.returnPending()&&!g.transitioning,"ordinary player's death never returns the world");
                 save(2);kill(b);require(g.returnPending(),"second holder's death initiates return");
             }else if(stage==2){
-                restored(g,a,b,c);require(g.supervisor.active().get("checkpoint_id").getAsString().equals(state.get("checkpoint").getAsString()),"shared checkpoint unchanged");
+                restored(g,a,b,c);require(checkpoint(g).equals(state.get("checkpoint").getAsString()),"shared checkpoint unchanged");
                 var books=g.archive.books().stream().filter(x->x.get("authority").getAsBoolean()).toList();require(books.size()==1,"only B produced an authority death book");
                 UUID secret=UUID.fromString(state.get("secret").getAsString());require(g.recognizes(a.getUUID(),secret)&&!g.recognizes(b.getUUID(),secret),"survivor private knowledge persists across return");
                 boolean retained=false;try(var reader=g.archive.reader(g.recorder.seal(a.getUUID()))){MemoryFrame f;while((f=reader.next())!=null)if(f.caption().contains("SURVIVOR_BRANCH_EXPERIENCE"))retained=true;}
@@ -131,6 +149,7 @@ public final class CompatScenario {
                 if(g.reading(a.getUUID())||g.reading(b.getUUID()))return;
                 for(String name:List.of("RbdA","RbdB")){Path report=root().resolve(name+"-read.json");require(Files.exists(report)&&AtomicJson.read(report).get("session").getAsString().equals(SESSION),"both clients rendered the book ending: "+name);}
                 require(g.archive.books().stream().filter(x->x.get("authority").getAsBoolean()).count()==1,"reading did not kill either holder");
+                if(Boolean.getBoolean("rbd.membershipTest")){var d=g.server.getPlayerList().getPlayerByName("RbdD");require(d!=null,"late joiner stayed connected through first return");d.getInventory().add(new ItemStack(Items.GOLD_INGOT,19));d.giveExperienceLevels(9);}
                 mutate(g,a,b,c);save(4);kill(a);kill(b);require(g.returnPending(),"both holders may die in one tick");
                 require(g.archive.books().stream().filter(x->x.get("authority").getAsBoolean()).count()==3,"both simultaneous deaths sealed before one return");
             }else if(stage==4){
@@ -138,8 +157,10 @@ public final class CompatScenario {
                 JsonObject last=AtomicJson.read(g.snapshots.control.resolve("last_return.json"));require(last.getAsJsonArray("deaths").size()==2,"one return transaction contains both simultaneous deaths");
                 long returns;try(var files=Files.list(g.snapshots.control.resolve("receipts"))){returns=files.filter(f->f.toString().endsWith(".json")).map(f->{try{return AtomicJson.read(f);}catch(Exception e){throw new RuntimeException(e);}}).filter(x->x.get("operation").getAsString().equals("RESTORE")).count();}
                 require(returns==2,"only two world restores for the three holder deaths");
-                var report=new JsonObject();report.addProperty("result","PASS");report.addProperty("players",3);report.addProperty("holders",2);report.addProperty("worldReturns",returns);report.addProperty("holderBooks",3);
-                report.addProperty("verified","Real three-client dedicated server; actual KRC and Twilight loaded; vanilla totem and life charm cancel death; transformed equipment and KRC attachment restoration; Naga, Twilight blocks, chest and progression restoration; cross-dimension player/XP/item restoration; second holder triggers return; ordinary player death does not; surviving holder remembers erased branch privately; simultaneous book readers render endings; simultaneous holder deaths seal two books in one restore; all clients reconnect after each supervisor restart");
+                if(Boolean.getBoolean("rbd.membershipTest")){UUID id=UUID.fromString(state.get("latePlayer").getAsString());require(g.server.getPlayerList().getPlayer(id)==null,"voluntary logout during disk work completed after restore");var nbt=net.minecraft.nbt.NbtIo.readCompressed(g.snapshots.world.resolve("playerdata").resolve(id+".dat"),net.minecraft.nbt.NbtAccounter.unlimitedHeap());require(nbt.getInt("XpLevel")==0&&nbt.getList("Inventory",10).isEmpty(),"departing player never overwrote checkpoint with failed-branch items or XP");}
+                var report=new JsonObject();report.addProperty("membershipDuringReturn",Boolean.getBoolean("rbd.membershipTest"));report.addProperty("result","PASS");report.addProperty("players",3);report.addProperty("holders",2);report.addProperty("worldReturns",returns);report.addProperty("holderBooks",3);
+                report.addProperty("connected",connected());report.add("loginCounts",new Gson().toJsonTree(logins));
+                report.addProperty("verified","Real three-client dedicated server; actual KRC and Twilight loaded; vanilla totem and life charm cancel death; transformed equipment and KRC attachment restoration; Naga, Twilight blocks, chest and progression restoration; cross-dimension player/XP/item restoration; second holder triggers return; ordinary player death does not; surviving holder remembers erased branch privately; simultaneous book readers render endings; simultaneous holder deaths seal two books in one restore; all clients retain their original play connections without another login");
                 JsonObject versions=new JsonObject();for(String id:List.of("rbd","neoforge","kamenridercraft","twilightforest","geckolib","player_animation_library"))versions.addProperty(id,ModList.get().getModContainerById(id).orElseThrow().getModInfo().getVersion().toString());report.add("versions",versions);
                 AtomicJson.write(root().resolve("report.json"),report);save(99);
             }

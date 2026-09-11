@@ -36,6 +36,10 @@ public final class RbdEvents {
     }
     @SubscribeEvent public void login(PlayerEvent.PlayerLoggedInEvent e){
         if(!(e.getEntity() instanceof ServerPlayer p)||GameSession.current==null)return;
+        if(ConnectedReturn.defer(()->{var fresh=p.server.getPlayerList().getPlayer(p.getUUID());if(fresh!=null)joined(fresh);} ))return;
+        joined(p);
+    }
+    private static void joined(ServerPlayer p){
         var game=GameSession.current;
         try{
             if(!game.isHolder(p.getUUID())&&game.authorities.hasRoom(RbdConfig.MAX_HOLDERS.get())&&
@@ -44,6 +48,7 @@ public final class RbdEvents {
             if(!game.branch.object("greeted").has(p.getUUID().toString())){
                 game.branch.object("greeted").addProperty(p.getUUID().toString(),true);
                 var library=game.branch.json.getAsJsonObject("library");
+                if(library==null)return;
                 p.sendSystemMessage(Component.translatable("message.rbd.welcome",library.get("x").getAsInt(),library.get("z").getAsInt()));
             }
         }catch(Exception ex){fault(game,ex);}
@@ -61,13 +66,7 @@ public final class RbdEvents {
         finally{game.saveGuard.close();}
         if(game.transitioning&&normalStopping){
             if(game.supervisor!=null){try{game.supervisor.stoppedNormally();}catch(IOException ex){LOG.error("Cannot seal supervisor stop",ex);}}
-            else {
-                // The server-stopped event precedes final thread exit. Join before opening any world file.
-                Thread worker=new Thread(()->{
-                    try{e.getServer().getRunningThread().join();game.snapshots.markClosed();game.snapshots.complete();dev.rbd.client.ReturnLifecycle.finished(game.snapshots.world.getFileName().toString(),null);}
-                    catch(Exception ex){LOG.error("Offline return failed",ex);dev.rbd.client.ReturnLifecycle.finished(game.snapshots.world.getFileName().toString(),ex.getMessage());}
-                },"RBD offline return");worker.setDaemon(false);worker.start();
-            }
+            else if(game.snapshots.pending())try{game.snapshots.markClosed();}catch(IOException ex){LOG.error("Cannot seal the explicitly stopped world for recovery",ex);}
         }
         GameSession.current=null;
     }
@@ -75,7 +74,7 @@ public final class RbdEvents {
         var game=GameSession.current;if(game==null)return;
         try{
             game.tick();
-            if(!game.transitioning&&!game.returnPending()&&e.getServer().getTickCount()%20==0){
+            if(!game.transitioning&&!game.returnPending()&&e.getServer().getTickCount()%RbdConfig.MIASMA_INTERVAL.get()==0){
                 double range=RbdConfig.MIASMA_RANGE.get();
                 for(ServerLevel level:game.server.getAllLevels())for(var entity:level.getAllEntities()){
                     if(!(entity instanceof Mob mob)||!mob.getType().is(SENSITIVE))continue;
@@ -113,7 +112,7 @@ public final class RbdEvents {
             game.recorder.sound(level,e.getEntity().position(),e.getSound().value().getLocation().toString(),e.getNewVolume(),e.getNewPitch());
     }
     @SubscribeEvent(priority=EventPriority.LOWEST) public void chat(ServerChatEvent e){
-        var game=GameSession.current;if(game==null||game.transitioning)return;
+        var game=GameSession.current;if(game==null||game.transitioning||!RbdConfig.RECORD_CHAT.get())return;
         try{for(ServerPlayer p:game.server.getPlayerList().getPlayers())game.recorder.caption(p,e.getUsername()+": "+e.getMessage().getString());}
         catch(Exception ex){fault(game,ex);}
     }
@@ -124,16 +123,16 @@ public final class RbdEvents {
     }
     @SubscribeEvent(priority=EventPriority.LOWEST) public void breakBlock(net.neoforged.neoforge.event.level.BlockEvent.BreakEvent e){
         if(!(e.getPlayer() instanceof ServerPlayer))return;
-        var game=GameSession.current;if(game==null||game.transitioning)return;
+        var game=GameSession.current;if(game==null||game.transitioning||!RbdConfig.RECORD_BLOCK_ACTIONS.get())return;
         try{game.recorder.caption(e.getPlayer(),"挖掘 / Break: "+e.getState().getBlock().getName().getString());}catch(Exception ex){fault(game,ex);}
     }
     @SubscribeEvent public void interact(PlayerInteractEvent.EntityInteract e){
         var game=GameSession.current;
         if(game==null||!(e.getEntity() instanceof ServerPlayer p)||!(e.getTarget() instanceof LivingEntity target))return;
-        if(game.reading(p.getUUID())){e.setCanceled(true);return;}
-        if(!p.hasLineOfSight(target))return;
+        if(game.transitioning||(RbdConfig.READ_LOCK.get()&&game.reading(p.getUUID()))){e.setCanceled(true);return;}
+        if(!p.hasLineOfSight(target)||!RbdConfig.RECORD_INTERACTIONS.get())return;
         try{
-            if(target instanceof net.minecraft.world.entity.npc.Villager&&!target.hasCustomName()){
+            if(RbdConfig.AUTO_NAME_VILLAGERS.get()&&target instanceof net.minecraft.world.entity.npc.Villager&&!target.hasCustomName()){
                 target.setCustomName(Component.literal("旅人 · "+target.getUUID().toString().substring(0,4)));
                 game.recorder.caption(p,target.getName().getString()+" 向你介紹了自己。");
                 game.recorder.caption(target,p.getGameProfile().getName()+" 前來交談。");
@@ -176,11 +175,11 @@ public final class RbdEvents {
     public static int confess(ServerPlayer p) throws IOException {
         var game=required();var soul=game.isHolder(p.getUUID())?game.soul(p.getUUID()):new JsonObject();boolean exception=soul.has("disclosureContext")&&soul.get("disclosureContext").getAsString().equals("tea_party");
         var decision=new DisclosurePolicy().evaluate(game.isHolder(p.getUUID()),DisclosurePolicy.Intent.REVEAL_AUTHORITY,exception?DisclosurePolicy.Context.AUTHORED_EXCEPTION:DisclosurePolicy.Context.ORDINARY,false);
-        if(decision.suppressDelivery()){
-            p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,60,5,false,false,false));p.addEffect(new MobEffectInstance(MobEffects.DARKNESS,60,0,false,false,false));
+        if(decision.suppressDelivery()&&RbdConfig.TABOO_ENABLED.get()){
+            p.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN,RbdConfig.TABOO_TICKS.get(),RbdConfig.TABOO_SLOWNESS.get(),false,false,false));p.addEffect(new MobEffectInstance(MobEffects.DARKNESS,RbdConfig.TABOO_TICKS.get(),0,false,false,false));
             p.playNotifySound(SoundEvents.WARDEN_HEARTBEAT,SoundSource.PLAYERS,0.8F,0.65F);
             p.displayClientMessage(Component.translatable("message.rbd.taboo"),true);
-            soul.addProperty("miasma",soul.has("miasma")?soul.get("miasma").getAsDouble()+1:1);
+            soul.addProperty("miasma",soul.has("miasma")?soul.get("miasma").getAsDouble()+RbdConfig.TABOO_MIASMA.get():RbdConfig.TABOO_MIASMA.get());
             game.recorder.caption(p,"心臟彷彿被無形的手攥住。話語沒有傳達出去。");
             if(soul.has("interventionTarget")){
                 UUID targetId=UUID.fromString(soul.get("interventionTarget").getAsString());soul.remove("interventionTarget");
@@ -205,6 +204,7 @@ public final class RbdEvents {
         }game.saveSoul();
     }
     private static void fault(GameSession game,Exception ex){
+        if(game.supervisor==null){ConnectedReturn.pauseWithFault(game,ex);return;}
         LOG.error("RBD stopped; memory/world transaction could not be completed",ex);
         try{var fault=new JsonObject();fault.addProperty("reason",ex.toString());dev.rbd.io.AtomicJson.write(game.snapshots.control.resolve("fault.json"),fault);}catch(Exception writeError){LOG.error("Could not write fault record",writeError);}
         game.transitioning=false;game.server.halt(false);
