@@ -33,7 +33,7 @@ jobs:
         working-directory: repository
         run: |
           bash tools/test_storage.sh
-          gson_jar=$(rg --files "$HOME/.gradle/caches/modules-2/files-2.1/com.google.code.gson/gson" -g 'gson-2.10.1.jar' | head -n 1)
+          gson_jar=$(find "${GRADLE_USER_HOME:-$HOME/.gradle}/caches/modules-2/files-2.1/com.google.code.gson/gson" -name 'gson-2.10.1.jar' -print -quit)
           RBD_MIGRATION_CLASSPATH="$PWD/build/storage-tests:$gson_jar" python -m unittest discover -s supervisor -v
       - name: Package JAR, sources and checksums
         run: python tools/ci_artifacts.py
