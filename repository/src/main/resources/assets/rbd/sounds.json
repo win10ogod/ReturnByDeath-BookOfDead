@@ -1,0 +1,38 @@
+{
+  "body.heartbeat": {
+    "subtitle": "subtitles.rbd.heartbeat",
+    "sounds": [
+      {
+        "name": "rbd:body/heartbeat",
+        "stream": false
+      }
+    ]
+  },
+  "body.breath": {
+    "subtitle": "subtitles.rbd.breath",
+    "sounds": [
+      {
+        "name": "rbd:body/breath",
+        "stream": false
+      }
+    ]
+  },
+  "body.airless": {
+    "subtitle": "subtitles.rbd.airless",
+    "sounds": [
+      {
+        "name": "rbd:body/airless",
+        "stream": false
+      }
+    ]
+  },
+  "body.gasp": {
+    "subtitle": "subtitles.rbd.gasp",
+    "sounds": [
+      {
+        "name": "rbd:body/gasp",
+        "stream": false
+      }
+    ]
+  }
+}

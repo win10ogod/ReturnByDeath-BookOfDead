@@ -1,0 +1,30 @@
+# Runtime data, local evidence, caches and build outputs
+**/.gradle/
+**/build/
+**/run/
+**/.rbd/
+**/__pycache__/
+**/.pytest_cache/
+**/.idea/
+**/.vscode/
+**/*.pyc
+**/*.tmp
+validation/
+FILE_MANIFEST.json
+dist/*
+!dist/INSTALL.txt
+*.log
+*.jfr
+*.hprof
+.env
+.env.*
+
+# Private design material never belongs in this publication checkout.
+docs/
+provenance/
+PRD*
+TECHNICAL_DESIGN*
+IMPLEMENTATION_STATUS*
+NOTICES*
+*.mp4
+*.mkv

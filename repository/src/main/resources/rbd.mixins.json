@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.rbd.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ReadingInputMixin"
+  ],
+  "client": [
+    "WorldOpenMixin",
+    "ImmersionRenderMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
