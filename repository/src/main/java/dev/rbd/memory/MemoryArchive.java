@@ -10,32 +10,61 @@ import java.util.*;
 import java.util.zip.*;
 
 /** Immutable shared-prefix segment graph. World NBT holds branch heads; the archive survives returns. */
-public final class MemoryArchive {
+public final class MemoryArchive implements AutoCloseable {
     public static final Gson GSON = new Gson();
     private final Path root;
+    private final dev.rbd.io.OrderedIo io;
     public MemoryArchive(Path root) throws IOException {
-        this.root=root; Files.createDirectories(root.resolve("segments")); Files.createDirectories(root.resolve("books"));
+        this(root,0);
     }
+    public MemoryArchive(Path root,long queueBytes) throws IOException {
+        this.root=root; Files.createDirectories(root.resolve("segments")); Files.createDirectories(root.resolve("books"));
+        io=queueBytes==0?null:new dev.rbd.io.OrderedIo("RBD memory archive",queueBytes);
+    }
+    public void check() throws IOException {if(io!=null)io.check();}
+    public void queueBudget(long bytes){if(io!=null)io.budget(bytes);}
+    public void flush() throws IOException {if(io!=null)io.flush();}
+    @Override public void close() throws IOException {if(io!=null)io.close();}
     public Path root(){return root;}
     public Segment begin(String parent) throws IOException {return new Segment(parent);}
     public final class Segment implements AutoCloseable {
         public final String id=UUID.randomUUID().toString();
         private final String parent;
         private final Path path;
-        private final BufferedWriter writer;
+        private BufferedWriter writer;
         private long count;
         private boolean closed;
         Segment(String parent) throws IOException {
             this.parent=parent;path=root.resolve("segments").resolve(id+".jsonl.gz");
+            // Keep this constructor hook compatible with existing pack compression adapters.
+            // Only the inexpensive stream setup stays here; serialization and compression run on the worker.
             writer=new BufferedWriter(new OutputStreamWriter(new GZIPOutputStream(new BufferedOutputStream(Files.newOutputStream(path,StandardOpenOption.CREATE_NEW),65536),65536),java.nio.charset.StandardCharsets.UTF_8),65536);
         }
-        public void append(MemoryFrame frame) throws IOException {if(closed)throw new IOException("Sealed memory segment");writer.write(GSON.toJson(frame));writer.newLine();count++;}
+        public void append(MemoryFrame frame) throws IOException {
+            if(closed)throw new IOException("Sealed memory segment");
+            if(io==null)write(frame);
+            else {
+                // Detach the mutable collections before crossing the server-thread boundary.
+                var copy=new MemoryFrame(frame.tick(),frame.dimension(),frame.x(),frame.y(),frame.z(),frame.yaw(),frame.pitch(),frame.health(),frame.caption(),List.copyOf(frame.contacts()),List.copyOf(frame.sounds()),frame.visualSource(),frame.width(),frame.height(),frame.pixels().clone(),frame.png(),frame.body());
+                long weight=512L+copy.pixels().length*4L+copy.png().length()*2L+copy.caption().length()*2L;
+                for(var contact:copy.contacts())weight+=128L+contact.name().length()*2L+contact.appearance().length()*2L;
+                for(var sound:copy.sounds())weight+=64L+sound.id().length()*2L;
+                io.submit(weight,()->write(copy));
+            }
+            count++;
+        }
+        private void write(MemoryFrame frame) throws IOException {writer.write(GSON.toJson(frame));writer.newLine();}
         public long count(){return count;}
         public void close() throws IOException {
-            if(closed)return; writer.close();
+            if(closed)return;
+            if(io==null)seal();else dev.rbd.io.OrderedIo.await(io.submit(1,this::seal));
+            closed=true;
+        }
+        private void seal() throws IOException {
+            writer.close();
             try(FileChannel f=FileChannel.open(path,StandardOpenOption.WRITE)){f.force(true);}
             JsonObject meta=new JsonObject();meta.addProperty("id",id);meta.addProperty("parent",parent);meta.addProperty("frames",count);meta.addProperty("sha256",SnapshotStore.hash(path));
-            AtomicJson.write(root.resolve("segments").resolve(id+".json"),meta);closed=true;
+            AtomicJson.write(root.resolve("segments").resolve(id+".json"),meta);
         }
     }
     public JsonObject sealBook(UUID soul,String name,String head,String branch,boolean authority,String coverage,String cause) throws IOException {

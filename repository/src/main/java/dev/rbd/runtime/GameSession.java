@@ -24,6 +24,8 @@ public final class GameSession implements AutoCloseable {
     public final SupervisorBridge supervisor;
     public final SaveFailureGuard saveGuard=new SaveFailureGuard();
     public final AuthorityRoster authorities;
+    private JsonObject savedSoul;
+    private final dev.rbd.core.AutoCheckpointClock autoCheckpoint;
     private final Map<UUID,JsonObject> pendingDeaths=new LinkedHashMap<>();
     public boolean transitioning;
     public String queuedMilestone;
@@ -38,10 +40,11 @@ public final class GameSession implements AutoCloseable {
     public GameSession(MinecraftServer server) throws IOException {
         this.server=server;Path world=server.getWorldPath(LevelResource.ROOT).toRealPath();
         supervisor=Boolean.getBoolean("rbd.legacySupervisor")&&server.isDedicatedServer()&&System.getenv("RBD_CONTROL_DIR")!=null?new SupervisorBridge(server):null;
-        snapshots=new SnapshotStore(world,supervisor!=null?supervisor.control():SnapshotStore.controlFor(world));
+        snapshots=new SnapshotStore(world,supervisor!=null?supervisor.control():SnapshotStore.controlFor(world),RbdConfig.REUSE_SNAPSHOT_FILES.get(server.getWorldData().getGameRules()));
         if(supervisor==null&&snapshots.pending())throw new IOException("Pending return must be recovered before opening the world");
         if(Files.exists(snapshots.control.resolve("fault.json")))throw new IOException("RBD archive has an unresolved fault: "+snapshots.control.resolve("fault.json"));
         branch=BranchData.get(server);
+        autoCheckpoint=new dev.rbd.core.AutoCheckpointClock(branch.json.has("autoCheckpointElapsed")?branch.json.get("autoCheckpointElapsed").getAsLong():0);
         Path rulesFile=snapshots.control.resolve("returned_rules.json");
         if(Files.exists(rulesFile)){
             var restoredRules=AtomicJson.read(rulesFile);String id=restoredRules.get("id").getAsString();
@@ -50,9 +53,10 @@ public final class GameSession implements AutoCloseable {
                 branch.json.addProperty("rulesTransaction",id);branch.setDirty();
             }
         }
-        archive=new MemoryArchive(snapshots.control.resolve("memories"));recorder=new MemoryRecorder(this);
+        archive=new MemoryArchive(snapshots.control.resolve("memories"),RbdConfig.MEMORY_QUEUE_MIB.get(server.getWorldData().getGameRules())*1048576L);recorder=new MemoryRecorder(this);
         Path authority=snapshots.control.resolve("authority.json");
         authorities=new AuthorityRoster(Files.exists(authority)?AtomicJson.read(authority):new JsonObject());
+        if(Files.exists(authority))savedSoul=authorities.json().deepCopy();
         restoreContinuations();
         saveGuard.attach();
     }
@@ -61,7 +65,10 @@ public final class GameSession implements AutoCloseable {
     public List<UUID> holders(){return authorities.activeIds();}
     public boolean returnPending(){return !pendingDeaths.isEmpty();}
     public UUID onlyHolder(){if(holders().size()!=1)throw new IllegalStateException("Specify a player when there are zero or multiple holders");return holders().getFirst();}
-    public void saveSoul() throws IOException {AtomicJson.write(snapshots.control.resolve("authority.json"),authorities.json());}
+    public void saveSoul() throws IOException {
+        JsonObject data=authorities.json();if(savedSoul!=null&&savedSoul.equals(data))return;
+        AtomicJson.write(snapshots.control.resolve("authority.json"),data);savedSoul=data.deepCopy();
+    }
     public void bind(ServerPlayer p) throws IOException {
         if(transitioning||returnPending())throw new IOException("Cannot grant authority during a return");
         JsonObject person=authorities.bind(p.getUUID(),p.getGameProfile().getName(),RbdConfig.MAX_HOLDERS.get());
@@ -120,6 +127,8 @@ public final class GameSession implements AutoCloseable {
         if(transitioning)throw new IOException("Return already in progress");
         saveGuard.check();
         recorder.close();
+        archive.close();
+        if(operation.equals("CAPTURE")){autoCheckpoint.reset();branch.json.addProperty("autoCheckpointElapsed",0);branch.setDirty();}
         if(death!=null){
             String returnId=death.get("id").getAsString();
             for(UUID who:holders()){
@@ -144,6 +153,8 @@ public final class GameSession implements AutoCloseable {
     }
     public void tick() throws IOException {
         if(transitioning){if(supervisor!=null)server.halt(false);return;}
+        archive.check();
+        archive.queueBudget(RbdConfig.MEMORY_QUEUE_MIB.get()*1048576L);
         if(returnPending()){
             JsonObject death=pendingDeaths.values().iterator().next().deepCopy();JsonArray all=new JsonArray();pendingDeaths.values().forEach(b->all.add(b.deepCopy()));death.add("deaths",all);
             transition("RESTORE",death);return;
@@ -164,7 +175,26 @@ public final class GameSession implements AutoCloseable {
             reading.ackAfterNanos=System.nanoTime()+(long)(dwell*1_000_000_000L);
             var msg=RbdNetwork.message("frame");msg.addProperty("session",reading.id);msg.addProperty("sequence",reading.sequence);msg.addProperty("dwell",dwell);msg.add("frame",MemoryArchive.GSON.toJsonTree(frame));RbdNetwork.sendLarge(p,msg);
         }
-        if(queuedMilestone!=null){String milestone=queuedMilestone;queuedMilestone=null;branch.object("milestones").addProperty(milestone,true);transition("CAPTURE",null);}
+        if(queuedMilestone!=null){String milestone=queuedMilestone;queuedMilestone=null;branch.object("milestones").addProperty(milestone,true);transition("CAPTURE",null);return;}
+        boolean occupied=false,safe=true;
+        for(UUID who:holders()){
+            ServerPlayer player=server.getPlayerList().getPlayer(who);
+            if(player==null)continue;
+            occupied=true;
+            safe&=safeForCheckpoint(player);
+        }
+        boolean capture=autoCheckpoint.tick(RbdConfig.AUTO_CHECKPOINT.get(),occupied,safe,RbdConfig.AUTO_CHECKPOINT_INTERVAL.get(),RbdConfig.AUTO_CHECKPOINT_QUIET.get());
+        // Persist online time in ordinary world saves, without a disk write every tick.
+        if(server.getTickCount()%20==0){branch.json.addProperty("autoCheckpointElapsed",autoCheckpoint.elapsed());branch.setDirty();}
+        if(capture)transition("CAPTURE",null);
+    }
+    public boolean safeForCheckpoint(ServerPlayer p){
+        if(!p.isAlive()||p.isSpectator()||!p.onGround()||p.isOnFire()||p.isUnderWater()||p.isInLava()||p.getTicksFrozen()>0||p.hurtTime>0||reading(p.getUUID()))return false;
+        if(p.getHealth()*100.0<p.getMaxHealth()*RbdConfig.AUTO_CHECKPOINT_HEALTH.get())return false;
+        if(connection(p.getUUID())!=CheckpointPolicy.Connection.CONNECTED&&connection(p.getUUID())!=CheckpointPolicy.Connection.SCRIPTED_RECONNECTION)return false;
+        if(branch.object("despairPhantoms").has(p.getUUID().toString()))return false;
+        var attacker=p.getLastHurtByMob();
+        return attacker==null||!attacker.isAlive()||p.tickCount-p.getLastHurtByMobTimestamp()>=RbdConfig.AUTO_CHECKPOINT_QUIET.get();
     }
     public void death(LivingEntity actor,net.minecraft.world.damagesource.DamageSource cause) throws IOException {
         if(pendingDeaths.containsKey(actor.getUUID()))return;
@@ -217,5 +247,5 @@ public final class GameSession implements AutoCloseable {
         if(kind.equals("select_book"))ArchiveLibrary.select(this,p,msg.get("id").getAsString());
     }
     public void disconnected(ServerPlayer player) throws IOException {endReading(player);recorder.seal(player.getUUID());uploads.remove(player.getUUID());}
-    public void close() throws IOException {uploads.clear();for(var reading:readings.values())reading.close();readings.clear();recorder.close();saveSoul();}
+    public void close() throws IOException {uploads.clear();for(var reading:readings.values())reading.close();readings.clear();recorder.close();archive.close();saveSoul();}
 }

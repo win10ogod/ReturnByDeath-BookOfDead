@@ -1,4 +1,5 @@
-package dev.rbd.memory;
+package dev.rbd.testing;
+import dev.rbd.memory.MemoryFrame;
 import dev.rbd.RbdConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -11,7 +12,7 @@ import net.minecraft.world.phys.*;
 import java.util.*;
 
 /** NPC perception uses first-hit rays. Occluded entities and container contents never enter a frame. */
-public final class Perception {
+final class PerceptionReference {
     public static boolean recorded(LivingEntity e){return (dev.rbd.runtime.GameSession.current!=null&&dev.rbd.runtime.GameSession.current.isHolder(e.getUUID()))||(e instanceof Player?RbdConfig.RECORD_PLAYERS.get():e instanceof Villager?RbdConfig.RECORD_VILLAGERS.get():e.hasCustomName()?RbdConfig.RECORD_NAMED.get():RbdConfig.RECORD_CREATURES.get());}
     public static String name(LivingEntity e){
         if(e instanceof Player||e.hasCustomName())return e.getName().getString();
@@ -28,16 +29,14 @@ public final class Perception {
         ServerLevel level=(ServerLevel)subject.level();Vec3 eye=subject.getEyePosition(),forward=subject.getLookAngle();
         Vec3 right=forward.cross(new Vec3(0,1,0)).normalize();if(right.lengthSqr()<0.01)right=new Vec3(1,0,0);
         Vec3 up=right.cross(forward).normalize();int distance=RbdConfig.PERCEPTION_DISTANCE.get();int[] image=new int[width*height];
-        double fov=RbdConfig.RASTER_FOV.get();int sky=level.isDay()?0x829ABD:0x151829;
-        FrameRays rays=new FrameRays(eye,subject);
         List<LivingEntity> entities=level.getEntitiesOfClass(LivingEntity.class,subject.getBoundingBox().inflate(distance),e->e!=subject&&!e.isInvisible());
         var cache=new HashMap<BlockPos,net.minecraft.world.level.block.state.BlockState>();
         for(int y=0;y<height;y++)for(int x=0;x<width;x++){
-            Vec3 direction=forward.add(right.scale((2.0*(x+0.5)/width-1)*fov*width/height)).add(up.scale((1-2.0*(y+0.5)/height)*fov)).normalize();
+            Vec3 direction=forward.add(right.scale((2.0*(x+0.5)/width-1)*RbdConfig.RASTER_FOV.get()*width/height)).add(up.scale((1-2.0*(y+0.5)/height)*RbdConfig.RASTER_FOV.get())).normalize();
             Vec3 end=eye.add(direction.scale(distance));
-            rays.end=end;var hit=level.clip(rays);
+            var hit=level.clip(new ClipContext(eye,end,ClipContext.Block.VISUAL,ClipContext.Fluid.ANY,subject));
             double nearest=hit.getType()==HitResult.Type.MISS?distance:eye.distanceTo(hit.getLocation());
-            int color=sky;
+            int color=level.isDay()?0x829ABD:0x151829;
             if(hit.getType()!=HitResult.Type.MISS){
                 var pos=hit.getBlockPos();var state=cache.computeIfAbsent(pos,level::getBlockState);
                 color=state.getMapColor(level,pos).col;if(color==0)color=0x655F6B;
@@ -52,22 +51,6 @@ public final class Perception {
             image[y*width+x]=0xFF000000|color;
         }return image;
     }
-    /** Cache shape work only within one image; the real level and collision context still reach mod blocks. */
-    private static final class FrameRays extends ClipContext {
-        Vec3 end;
-        private final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<net.minecraft.world.phys.shapes.VoxelShape> blocks=new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
-        private final it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<net.minecraft.world.phys.shapes.VoxelShape> fluids=new it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap<>();
-        FrameRays(Vec3 eye,Entity actor){super(eye,eye,Block.VISUAL,Fluid.ANY,actor);end=eye;}
-        @Override public Vec3 getTo(){return end;}
-        @Override public net.minecraft.world.phys.shapes.VoxelShape getBlockShape(net.minecraft.world.level.block.state.BlockState state,net.minecraft.world.level.BlockGetter level,BlockPos pos){
-            long key=pos.asLong();var shape=blocks.get(key);
-            if(shape==null){shape=super.getBlockShape(state,level,pos);blocks.put(key,shape);}return shape;
-        }
-        @Override public net.minecraft.world.phys.shapes.VoxelShape getFluidShape(net.minecraft.world.level.material.FluidState state,net.minecraft.world.level.BlockGetter level,BlockPos pos){
-            long key=pos.asLong();var shape=fluids.get(key);
-            if(shape==null){shape=super.getFluidShape(state,level,pos);fluids.put(key,shape);}return shape;
-        }
-    }
     private static int shade(int rgb,double factor){return ((int)(((rgb>>16)&255)*factor)<<16)|((int)(((rgb>>8)&255)*factor)<<8)|(int)((rgb&255)*factor);}
-    private Perception(){}
+    private PerceptionReference(){}
 }

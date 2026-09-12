@@ -234,5 +234,19 @@
   "gamerule.rbdPhantomInterceptTicks": "Phantom: Interception prediction ticks",
   "gamerule.rbdPhantomInterceptTicks.description": "Predict intercept positions from observed movement, increasing with growth.",
   "gamerule.rbdPhantomAimLeadTicks": "Phantom: Aim lead ticks",
-  "gamerule.rbdPhantomAimLeadTicks.description": "Maximum movement lead for native weapon aim; zero disables leading."
+  "gamerule.rbdPhantomAimLeadTicks.description": "Maximum movement lead for native weapon aim; zero disables leading.",
+  "gamerule.rbdAutoCheckpoint": "Automatically update return checkpoints",
+  "gamerule.rbdAutoCheckpoint.description": "Automatically updates the shared world checkpoint during online play. Existing authored checkpoints remain available; no player manual-save action is added.",
+  "gamerule.rbdAutoCheckpointIntervalTicks": "Automatic checkpoint interval (ticks)",
+  "gamerule.rbdAutoCheckpointIntervalTicks.description": "Default 12000 ticks = 10 minutes at 20 TPS. Pauses without online holders; resets after checkpoint capture or return.",
+  "gamerule.rbdAutoCheckpointSafeTicks": "Safe window before automatic checkpoint (ticks)",
+  "gamerule.rbdAutoCheckpointSafeTicks.description": "Default 200 ticks = 10 seconds. All online holders must remain safe. Injury, low health, burning, falling, submersion, reading or a phantom hunt postpones saving.",
+  "gamerule.rbdAutoCheckpointMinHealthPercent": "Minimum health percent for automatic checkpoint",
+  "gamerule.rbdAutoCheckpointMinHealthPercent.description": "Default 75%. Keeps the previous checkpoint while an online holder is below this health percentage.",
+  "gamerule.rbdMemoryWriteQueueMiB": "Background memory write buffer (MiB)",
+  "gamerule.rbdMemoryWriteQueueMiB.description": "Default 64 MiB. Compresses and writes in order. A full buffer applies backpressure without dropping frames; one oversized frame is accepted alone at full resolution.",
+  "gamerule.rbdClientImageQueueMiB": "Client image compression buffer (MiB)",
+  "gamerule.rbdClientImageQueueMiB.description": "Default 64 MiB. Encodes captured PNG images in the background at the configured resolution and frequency. A full buffer applies backpressure.",
+  "gamerule.rbdReuseSnapshotFiles": "Reuse unchanged snapshot files",
+  "gamerule.rbdReuseSnapshotFiles.description": "Reuses unchanged files between immutable snapshots with full checksum verification. Live and restored worlds always have independent files. Falls back to copying when unsupported; applies on the next world open."
 }

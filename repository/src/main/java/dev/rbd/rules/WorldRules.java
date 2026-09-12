@@ -16,9 +16,10 @@ public final class WorldRules {
     private static volatile Map<String,String> client=Map.of();
     public static boolean initialized;
     public record Setting<T>(GameRules.Key<?> key,Supplier<T> initial,Function<String,T> parse,Function<T,String> print) implements Supplier<T> {
+        public T get(GameRules rules){return parse.apply(value(rules,key).serialize());}
         @Override public T get(){
             var game=GameSession.current;
-            if(game!=null&&game.server.isSameThread())return parse.apply(value(game.server.getWorldData().getGameRules(),key).serialize());
+            if(game!=null&&game.server.isSameThread())return get(game.server.getWorldData().getGameRules());
             String synchronizedValue=client.get(key.getId());return synchronizedValue==null?initial.get():parse.apply(synchronizedValue);
         }
     }

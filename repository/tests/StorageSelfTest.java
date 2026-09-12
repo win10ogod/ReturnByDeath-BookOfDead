@@ -33,6 +33,14 @@ public final class StorageSelfTest {
             check(Files.list(s.control.resolve("failed")).findAny().isPresent(),"failed branch retained");
             check(Files.list(s.control.resolve("returns")).count()==1,"death receipt exactly once");s.complete();check(Files.list(s.control.resolve("returns")).count()==1,"retry does not duplicate death");
             write(s.world,"level.dat","second checkpoint");capture(s);check(s.active().get("ordinal").getAsLong()==2,"monotonic checkpoint");restore(s);check(Files.readString(s.world.resolve("level.dat")).equals("second checkpoint"),"restore newest checkpoint only");
+            Path firstTree=s.control.resolve("snapshots").resolve(first).resolve("tree");
+            Path secondTree=s.control.resolve("snapshots").resolve(s.active().get("id").getAsString()).resolve("tree");
+            check(Files.isSameFile(firstTree.resolve("data/scoreboard.dat"),secondTree.resolve("data/scoreboard.dat")),"unchanged immutable snapshot files reused");
+            check(!Files.isSameFile(s.world.resolve("data/scoreboard.dat"),secondTree.resolve("data/scoreboard.dat")),"restored live world never shares snapshot inodes");
+            write(s.world,"data/scoreboard.dat","live mutation");check(Files.readString(secondTree.resolve("data/scoreboard.dat")).equals("score"),"live writes cannot mutate historical checkpoints");
+            check(Files.readString(firstTree.resolve("level.dat")).equals("before"),"changed file keeps original checkpoint bytes");
+            var independent=fresh("independent");var noReuse=new SnapshotStore(independent.world,independent.control,false);capture(noReuse);String oldId=noReuse.active().get("id").getAsString();capture(noReuse);
+            check(!Files.isSameFile(noReuse.control.resolve("snapshots/"+oldId+"/tree/level.dat"),noReuse.control.resolve("snapshots/"+noReuse.active().get("id").getAsString()+"/tree/level.dat")),"file reuse can be disabled without changing snapshot data");
             var corrupt=fresh("corrupt");capture(corrupt);write(corrupt.control.resolve("snapshots").resolve(corrupt.active().get("id").getAsString()).resolve("tree"),"level.dat","corrupt");
             var configured=fresh("configured");capture(configured);var rules=new JsonObject();rules.addProperty("rbdMaxHolders","3");rules.addProperty("rbdMemoryDeathDwellSeconds","0.123456789");
             configured.prepare("RESTORE",null,rules);configured.markClosed();configured.complete();

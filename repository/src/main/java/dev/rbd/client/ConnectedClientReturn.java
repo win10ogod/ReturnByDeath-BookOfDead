@@ -5,7 +5,7 @@ import net.minecraft.stats.RecipeBook;
 public final class ConnectedClientReturn {
     public static boolean paused,resetWorld;
     public static int completedResets;
-    public static void begin(){paused=true;}
+    public static void begin(){ClientRecorder.reset();paused=true;}
     public static void reset(){
         var mc=Minecraft.getInstance();resetWorld=true;
         if(mc.level!=null)((dev.rbd.mixin.ClientMapAccess)mc.level).rbd$maps().clear();

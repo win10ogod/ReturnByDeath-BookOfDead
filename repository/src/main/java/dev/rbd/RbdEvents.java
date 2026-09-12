@@ -29,6 +29,15 @@ public final class RbdEvents {
     private static final Logger LOG=LoggerFactory.getLogger("rbd");
     private static boolean normalStopping;
     private static final TagKey<EntityType<?>> SENSITIVE=TagKey.create(Registries.ENTITY_TYPE,ResourceLocation.fromNamespaceAndPath("rbd","miasma_sensitive"));
+    @SubscribeEvent(priority=EventPriority.LOWEST) public void entityJoined(net.neoforged.neoforge.event.entity.EntityJoinLevelEvent e){
+        var game=GameSession.current;
+        if(game!=null&&!game.transitioning&&e.getLevel() instanceof ServerLevel&&e.getEntity() instanceof LivingEntity actor)game.recorder.joined(actor);
+    }
+    @SubscribeEvent public void entityLeft(net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent e){
+        var game=GameSession.current;
+        if(game!=null&&!game.transitioning&&e.getLevel() instanceof ServerLevel&&e.getEntity() instanceof LivingEntity actor)
+            try{game.recorder.left(actor);}catch(Exception ex){fault(game,ex);}
+    }
     @SubscribeEvent public void started(ServerStartedEvent e){
         normalStopping=false;ArchiveLibrary.clear();
         try{GameSession.current=new GameSession(e.getServer());ArchiveLibrary.generate(GameSession.current);}
@@ -77,12 +86,17 @@ public final class RbdEvents {
             dev.rbd.phantom.PhantomEncounters.tick(game);
             if(!game.transitioning&&!game.returnPending()&&e.getServer().getTickCount()%RbdConfig.MIASMA_INTERVAL.get()==0){
                 double range=RbdConfig.MIASMA_RANGE.get();
+                List<ServerPlayer> sources=new ArrayList<>();
+                for(UUID id:game.holders()){
+                    ServerPlayer p=game.server.getPlayerList().getPlayer(id);var soul=game.soul(id);
+                    if(p!=null&&p.isAlive()&&soul.has("miasma")&&soul.get("miasma").getAsDouble()>0)sources.add(p);
+                }
+                if(sources.isEmpty())return;
                 for(ServerLevel level:game.server.getAllLevels())for(var entity:level.getAllEntities()){
                     if(!(entity instanceof Mob mob)||!mob.getType().is(SENSITIVE))continue;
                     ServerPlayer nearest=null;double distance=range*range;
-                    for(UUID id:game.holders()){
-                        ServerPlayer p=game.server.getPlayerList().getPlayer(id);var soul=game.soul(id);
-                        if(p==null||p.serverLevel()!=level||!p.isAlive()||!soul.has("miasma")||soul.get("miasma").getAsDouble()<=0)continue;
+                    for(ServerPlayer p:sources){
+                        if(p.serverLevel()!=level)continue;
                         double d=mob.distanceToSqr(p);if(d<=distance){nearest=p;distance=d;}
                     }
                     if(nearest!=null)mob.setTarget(nearest);

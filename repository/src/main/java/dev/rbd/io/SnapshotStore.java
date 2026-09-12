@@ -13,7 +13,12 @@ import static java.nio.file.StandardOpenOption.*;
 /** Verified snapshots. Every world writer and storage handle must be closed before a transaction; the network may remain alive. */
 public final class SnapshotStore {
     public final Path world, control;
+    private final boolean reuseFiles;
     public SnapshotStore(Path world, Path control) throws IOException {
+        this(world,control,true);
+    }
+    public SnapshotStore(Path world, Path control,boolean reuseFiles) throws IOException {
+        this.reuseFiles=reuseFiles;
         this.world = world.toAbsolutePath().normalize();
         this.control = control.toAbsolutePath().normalize();
         if (this.world.startsWith(this.control) || this.control.startsWith(this.world))
@@ -78,7 +83,11 @@ public final class SnapshotStore {
             if (Files.exists(stage)) Files.move(stage, stage.resolveSibling(id + ".interrupted-" + UUID.randomUUID()));
             Files.createDirectories(stage);
             JsonObject manifest;
-            try (WorldLock ignored = lockWorld(world)) { manifest = copyVerified(world, stage.resolve("tree")); }
+            JsonObject previous=active();Path prior=previous==null?null:control.resolve("snapshots").resolve(uuid(previous.get("id").getAsString()));
+            try (WorldLock ignored = lockWorld(world)) {
+                manifest = copyVerified(world, stage.resolve("tree"),reuseFiles&&prior!=null?prior.resolve("tree"):null,
+                    reuseFiles&&prior!=null?AtomicJson.read(prior.resolve("manifest.json")):null);
+            }
             AtomicJson.write(stage.resolve("manifest.json"), manifest);
             Files.move(stage, snapshot, ATOMIC_MOVE);
         }
@@ -150,14 +159,28 @@ public final class SnapshotStore {
         JsonObject result = new JsonObject(); result.add("files", files); result.add("directories", dirs); return result;
     }
     public static JsonObject copyVerified(Path source, Path target) throws IOException {
+        // Restoring a live world always copies bytes; it must never share writable files with a snapshot.
+        return copyVerified(source,target,null,null);
+    }
+    private static JsonObject copyVerified(Path source,Path target,Path previous,JsonObject previousManifest) throws IOException {
         JsonObject before = inventory(source);
-        long bytes = before.getAsJsonObject("files").entrySet().stream().mapToLong(e -> e.getValue().getAsJsonObject().get("size").getAsLong()).sum();
+        JsonObject oldFiles=previousManifest==null?new JsonObject():previousManifest.getAsJsonObject("files");
+        long bytes = before.getAsJsonObject("files").entrySet().stream().filter(e->!e.getValue().equals(oldFiles.get(e.getKey()))).mapToLong(e -> e.getValue().getAsJsonObject().get("size").getAsLong()).sum();
         Files.createDirectories(target.getParent());
         if (Files.getFileStore(target.getParent()).getUsableSpace() < bytes) throw new IOException("Insufficient space for the complete world snapshot");
         Files.createDirectory(target);
         for (JsonElement directory : before.getAsJsonArray("directories")) Files.createDirectories(target.resolve(directory.getAsString()));
         for (String relative : before.getAsJsonObject("files").keySet()) {
-            Path out = target.resolve(relative); Files.copy(source.resolve(relative), out, COPY_ATTRIBUTES);
+            Path out = target.resolve(relative);
+            if(previous!=null&&before.getAsJsonObject("files").get(relative).equals(oldFiles.get(relative))){
+                Path old=previous.resolve(relative);
+                // Only immutable snapshot trees share inodes. Verify their bytes in the final full-tree checksum pass.
+                if(Files.isRegularFile(old,LinkOption.NOFOLLOW_LINKS)){
+                    try{Files.createLink(out,old);continue;}
+                    catch(UnsupportedOperationException|IOException unsupported){if(Files.exists(out,LinkOption.NOFOLLOW_LINKS))throw new IOException("Ambiguous snapshot link: "+out,unsupported);}
+                }
+            }
+            Files.copy(source.resolve(relative), out, COPY_ATTRIBUTES);
             try (FileChannel file = FileChannel.open(out, WRITE)) { file.force(true); }
         }
         verify(source, before); verify(target, before); return before;

@@ -44,6 +44,13 @@ public final class RbdConfig {
     public static final Setting<Boolean> READ_LOCK=WorldRules.bool("rbdLockBodyWhileReading",()->true);
     public static final Setting<Integer> SEGMENT_FRAMES=WorldRules.integer("rbdMemorySegmentFrames",()->200,1,2147483647);
     public static final Setting<Integer> SOUL_SAVE_TICKS=WorldRules.integer("rbdSoulSaveIntervalTicks",()->100,1,2147483647);
+    public static final Setting<Boolean> AUTO_CHECKPOINT=WorldRules.bool("rbdAutoCheckpoint",()->true);
+    public static final Setting<Integer> AUTO_CHECKPOINT_INTERVAL=WorldRules.integer("rbdAutoCheckpointIntervalTicks",()->12000,20,2147483647);
+    public static final Setting<Integer> AUTO_CHECKPOINT_QUIET=WorldRules.integer("rbdAutoCheckpointSafeTicks",()->200,0,2147483647);
+    public static final Setting<Double> AUTO_CHECKPOINT_HEALTH=WorldRules.decimal("rbdAutoCheckpointMinHealthPercent",()->75.0,0,100);
+    public static final Setting<Integer> MEMORY_QUEUE_MIB=WorldRules.integer("rbdMemoryWriteQueueMiB",()->64,1,4096);
+    public static final Setting<Integer> IMAGE_QUEUE_MIB=WorldRules.integer("rbdClientImageQueueMiB",()->64,1,4096);
+    public static final Setting<Boolean> REUSE_SNAPSHOT_FILES=WorldRules.bool("rbdReuseSnapshotFiles",()->true);
     public static final Setting<Double> RETURN_DWELL=WorldRules.decimal("rbdReturnEndingSeconds",()->4.0,0,86400);
     public static final Setting<Double> ECHO_SECONDS=WorldRules.decimal("rbdReturnEchoSeconds",()->5.0,0,86400);
     public static final Setting<Double> ECHO_COOLDOWN=WorldRules.decimal("rbdDeathSiteRecallDelaySeconds",()->10.0,0,86400);

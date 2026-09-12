@@ -10,21 +10,34 @@ import java.util.*;
 public final class MemoryRecorder implements AutoCloseable {
     private final GameSession game;
     private final Map<UUID,Track> tracks=new HashMap<>();
+    private final Set<LivingEntity> observed=Collections.newSetFromMap(new IdentityHashMap<>());
+    private LivingEntity[] observers=new LivingEntity[0];
+    private boolean observersChanged=true;
     private static final class Track {
         LivingEntity actor;MemoryArchive.Segment segment;List<MemoryFrame.Sound> sounds=new ArrayList<>();
         String caption="";int[] pixels=new int[0];String png="";int width,height;long imageTick=Long.MIN_VALUE;
         String damageType="";double damage;
         Track(LivingEntity actor){this.actor=actor;}
     }
-    public MemoryRecorder(GameSession game){this.game=game;}
+    public MemoryRecorder(GameSession game){
+        this.game=game;
+        for(ServerLevel level:game.server.getAllLevels())for(var entity:level.getAllEntities())if(entity instanceof LivingEntity actor)observed.add(actor);
+    }
+    public void joined(LivingEntity actor){observersChanged|=observed.add(actor);}
+    public void left(LivingEntity actor) throws IOException {
+        observersChanged|=observed.remove(actor);Track track=tracks.get(actor.getUUID());
+        if(track!=null&&track.actor==actor)seal(actor.getUUID());
+    }
     private Track track(LivingEntity e) throws IOException {
         Track t=tracks.get(e.getUUID());if(t!=null){t.actor=e;return t;}
         t=new Track(e);var heads=game.branch.object("heads");String parent=heads.has(e.getUUID().toString())?heads.get(e.getUUID().toString()).getAsString():"";
         t.segment=game.archive.begin(parent);tracks.put(e.getUUID(),t);return t;
     }
     public void tick() throws IOException {
-        for(ServerLevel level:game.server.getAllLevels())for(var entity:level.getAllEntities()){
-            if(entity instanceof LivingEntity e&&e.isAlive()&&Perception.recorded(e))record(e,false);
+        if(observersChanged){observers=observed.toArray(LivingEntity[]::new);observersChanged=false;}
+        for(var e:observers){
+            if(e.isRemoved()){observersChanged|=observed.remove(e);continue;}
+            if(e.isAlive()&&Perception.recorded(e))record(e,false);
         }
         for(UUID id:List.copyOf(tracks.keySet()))if(tracks.get(id).actor.isRemoved())seal(id);
     }

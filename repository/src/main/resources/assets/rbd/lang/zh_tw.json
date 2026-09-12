@@ -234,5 +234,19 @@
   "gamerule.rbdPhantomInterceptTicks": "幻影：攔截預判時間",
   "gamerule.rbdPhantomInterceptTicks.description": "依觀察到的玩家移動預判攔截位置，並隨成長增加。",
   "gamerule.rbdPhantomAimLeadTicks": "幻影：瞄準提前時間",
-  "gamerule.rbdPhantomAimLeadTicks.description": "原生武器瞄準時對移動目標的最大提前 tick 數；0 停用。"
+  "gamerule.rbdPhantomAimLeadTicks.description": "原生武器瞄準時對移動目標的最大提前 tick 數；0 停用。",
+  "gamerule.rbdAutoCheckpoint": "定時更新回歸存檔點",
+  "gamerule.rbdAutoCheckpoint.description": "啟用後依在線遊玩時間自動更新全世界共用的回歸點。保留既有劇情／進度存檔；不提供玩家手動存檔。",
+  "gamerule.rbdAutoCheckpointIntervalTicks": "自動回歸存檔間隔（tick）",
+  "gamerule.rbdAutoCheckpointIntervalTicks.description": "預設 12000 tick＝10 分鐘（20 TPS）。無持有者在線時不計時；存檔或回歸後重新計時。",
+  "gamerule.rbdAutoCheckpointSafeTicks": "自動存檔前的安全時間（tick）",
+  "gamerule.rbdAutoCheckpointSafeTicks.description": "預設 200 tick＝10 秒。所有在線持有者須持續安全；低血量、受傷、燃燒、落下、溺水、閱讀或幻影追獵時延後。",
+  "gamerule.rbdAutoCheckpointMinHealthPercent": "自動存檔最低生命百分比",
+  "gamerule.rbdAutoCheckpointMinHealthPercent.description": "預設 75%。低於此生命比例時保留上一個回歸點，等恢復後再存檔。",
+  "gamerule.rbdMemoryWriteQueueMiB": "背景記憶寫入緩衝（MiB）",
+  "gamerule.rbdMemoryWriteQueueMiB.description": "預設 64 MiB。背景依序壓縮與寫入；緩衝滿時等待，不丟棄影格。超大單幀獨佔緩衝，保留原始解析度。",
+  "gamerule.rbdClientImageQueueMiB": "客戶端影像壓縮緩衝（MiB）",
+  "gamerule.rbdClientImageQueueMiB.description": "預設 64 MiB。擷取後於背景壓縮 PNG，不改變解析度與錄製頻率；緩衝滿時等待。",
+  "gamerule.rbdReuseSnapshotFiles": "重用未變動的快照檔案",
+  "gamerule.rbdReuseSnapshotFiles.description": "完整校驗後讓不可變備份共用未改變的檔案，減少寫入量。遊戲存檔與還原世界仍使用獨立檔案。不支援時自動複製；下次開啟世界生效。"
 }
