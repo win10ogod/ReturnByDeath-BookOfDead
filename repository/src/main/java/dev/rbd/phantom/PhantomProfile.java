@@ -30,7 +30,8 @@ public final class PhantomProfile {
     }
     public static int tier(JsonObject p){
         if(!PhantomRules.LEARNING.get())return 0;
-        double growth=number(p,"level")/15+Math.log1p(number(p,"melee")+number(p,"ranged")+number(p,"blocking")+number(p,"evasion"))/2;
+        double equipment=Math.log1p(Math.max(0,number(p,"health")-20)/10+Math.max(0,number(p,"damage")-1)/4+number(p,"armor")/5);
+        double growth=Math.max(number(p,"level")/15,equipment)+Math.log1p(number(p,"melee")+number(p,"ranged")+number(p,"blocking")+number(p,"evasion"))/2;
         return growth>=5?3:growth>=3?2:growth>=1?1:0;
     }
     public static boolean prefers(JsonObject p,String a,String b){return PhantomRules.LEARNING.get()&&number(p,a)>number(p,b);}

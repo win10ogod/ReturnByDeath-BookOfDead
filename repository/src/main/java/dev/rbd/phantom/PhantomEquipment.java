@@ -109,7 +109,11 @@ public final class PhantomEquipment {
         ItemStack stack=boss.getMainHandItem();Item item=stack.getItem();
         // Consumables and blocks are retained in the full snapshot, but aren't combat actions.
         if(item instanceof BlockItem||stack.getFoodProperties(boss)!=null||item instanceof BucketItem)return false;
-        Actor proxy=actor(boss);Vec3 aim=target.getEyePosition().subtract(proxy.getEyePosition());
+        Actor proxy=actor(boss);Vec3 aim=boss.combat().aim(target).subtract(proxy.getEyePosition());
+        if(item instanceof BowItem||item instanceof CrossbowItem||item instanceof TridentItem){
+            double speed=item instanceof CrossbowItem?3.15:item instanceof TridentItem?2.5:Math.max(0.1,BowItem.getPowerForTime(PhantomRules.CHARGE_TICKS.get())*3);
+            double flight=aim.horizontalDistance()/speed;aim=aim.add(0,0.025*flight*flight,0);
+        }
         proxy.setYRot((float)(Math.toDegrees(Math.atan2(aim.z,aim.x))-90));proxy.setXRot((float)-Math.toDegrees(Math.atan2(aim.y,aim.horizontalDistance())));
         Set<UUID> before=new HashSet<>();ServerLevel level=(ServerLevel)boss.level();for(Entity e:level.getAllEntities())before.add(e.getUUID());
         var result=item.use(level,proxy,InteractionHand.MAIN_HAND);proxy.setItemInHand(InteractionHand.MAIN_HAND,result.getObject());
@@ -117,10 +121,13 @@ public final class PhantomEquipment {
             ItemStack active=proxy.getUseItem();int duration=active.getUseDuration(proxy);
             active.releaseUsing(level,proxy,Math.max(0,duration-PhantomRules.CHARGE_TICKS.get()));proxy.stopUsingItem();
         }
+        if(item instanceof CrossbowItem&&CrossbowItem.isCharged(proxy.getMainHandItem())){
+            var shot=item.use(level,proxy,InteractionHand.MAIN_HAND);proxy.setItemInHand(InteractionHand.MAIN_HAND,shot.getObject());
+        }
         boss.setItemSlot(EquipmentSlot.MAINHAND,proxy.getMainHandItem().copy());
         for(int i=0;i<boss.inventoryCopy.size();i++)boss.inventoryCopy.set(i,proxy.getInventory().getItem(i).copy());
         for(Entity e:level.getAllEntities())if(!before.contains(e.getUUID())){
-            if(e instanceof net.minecraft.world.entity.projectile.Projectile projectile&&projectile.getOwner()==proxy)projectile.setOwner(boss);
+            if(e instanceof net.minecraft.world.entity.projectile.Projectile projectile&&projectile.getOwner()==proxy){projectile.setOwner(boss);boss.rememberRangedWeapon(stack);}
             if(e instanceof AbstractArrow arrow)arrow.pickup=AbstractArrow.Pickup.DISALLOWED;
         }
         return result.getResult().consumesAction();

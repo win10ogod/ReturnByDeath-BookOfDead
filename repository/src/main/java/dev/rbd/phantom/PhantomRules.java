@@ -40,6 +40,19 @@ public final class PhantomRules {
     public static final Setting<Double> REGEN=WorldRules.decimal("rbdPhantomRegenerationPerSecond",()->2.0,0,1000000);
     public static final Setting<Double> LIFESTEAL=WorldRules.decimal("rbdPhantomLifestealRatio",()->0.25,0,1000);
     public static final Setting<Boolean> PURSUIT=WorldRules.bool("rbdPhantomCanTeleport",()->true);
+    public static final Setting<Boolean> TACTICAL=WorldRules.bool("rbdPhantomTacticalMovement",()->true);
+    public static final Setting<Double> RANGED_MIN=WorldRules.decimal("rbdPhantomRangedMinDistance",()->6.0,0,1024);
+    public static final Setting<Double> RANGED_MAX=WorldRules.decimal("rbdPhantomRangedMaxDistance",()->14.0,0,1024);
+    public static final Setting<Boolean> DODGE=WorldRules.bool("rbdPhantomDodgeProjectiles",()->true);
+    public static final Setting<Integer> DODGE_LOOKAHEAD=WorldRules.integer("rbdPhantomDodgeLookaheadTicks",()->12,1,100);
+    public static final Setting<Integer> DODGE_COOLDOWN=WorldRules.integer("rbdPhantomDodgeCooldownTicks",()->30,1,Integer.MAX_VALUE);
+    public static final Setting<Double> DODGE_DISTANCE=WorldRules.decimal("rbdPhantomDodgeDistance",()->3.0,0,128);
+    public static final Setting<Double> DODGE_SPEED=WorldRules.decimal("rbdPhantomDodgeSpeed",()->1.6,0.01,100);
+    public static final Setting<Integer> REACTION_TICKS=WorldRules.integer("rbdPhantomReactionTicks",()->4,1,Integer.MAX_VALUE);
+    public static final Setting<Integer> PATH_TICKS=WorldRules.integer("rbdPhantomPathIntervalTicks",()->8,1,Integer.MAX_VALUE);
+    public static final Setting<Double> FLANK_DISTANCE=WorldRules.decimal("rbdPhantomFlankDistance",()->2.75,0.1,128);
+    public static final Setting<Integer> INTERCEPT_TICKS=WorldRules.integer("rbdPhantomInterceptTicks",()->8,0,100);
+    public static final Setting<Integer> AIM_LEAD_TICKS=WorldRules.integer("rbdPhantomAimLeadTicks",()->6,0,100);
     public static void initialize(){}
     private PhantomRules(){}
 }

@@ -40,6 +40,8 @@ public final class DespairPhantomEntity extends PathfinderMob implements Enemy,n
     private Vec3 lastPosition=Vec3.ZERO;
     private JsonObject history=new JsonObject();
     private String tactic="pursuit";
+    private final PhantomCombat combat=new PhantomCombat(this);
+    private final Set<String> rangedWeapons=new HashSet<>();
 
     public DespairPhantomEntity(EntityType<? extends DespairPhantomEntity> type,Level level){
         super(type,level);xpReward=0;setPersistenceRequired();setCanPickUpLoot(false);
@@ -58,6 +60,14 @@ public final class DespairPhantomEntity extends PathfinderMob implements Enemy,n
     public int phase(){return entityData.get(PHASE);}
     public String boon(){return entityData.get(BOON);}
     public String tactic(){return tactic;}
+    public PhantomCombat combat(){return combat;}
+    public boolean hasRangedWeapon(){
+        ItemStack stack=getMainHandItem();Item item=stack.getItem();
+        if(item instanceof CrossbowItem&&CrossbowItem.isCharged(stack))return true;
+        if(item instanceof ProjectileWeaponItem weapon)return weapon.getSupportedHeldProjectiles(stack).test(getOffhandItem())||inventoryCopy.stream().anyMatch(weapon.getAllSupportedProjectiles(stack));
+        return item instanceof TridentItem||rangedWeapons.contains(BuiltInRegistries.ITEM.getKey(item).toString());
+    }
+    public void rememberRangedWeapon(ItemStack stack){rangedWeapons.add(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());}
     public int learningTier(){return PhantomProfile.tier(history);}
     public int auraDelay(){return auraDelay;}
     public ServerPlayer quarry(){return quarry==null||level().isClientSide?null:((ServerLevel)level()).getServer().getPlayerList().getPlayer(quarry);}
@@ -109,7 +119,7 @@ public final class DespairPhantomEntity extends PathfinderMob implements Enemy,n
         }
         setTarget(target);
         if(tickCount%20==0){
-            PhantomProfile.observe(target);PhantomProfile.learn(target,target.isBlocking()?"blocking":target.getDeltaMovement().horizontalDistanceSqr()>0.02?"evasion":"melee",0.1);
+            PhantomProfile.observe(target);PhantomProfile.learn(target,target.isBlocking()?"blocking":combat.observedMotion().horizontalDistanceSqr()>0.02?"evasion":"melee",0.1);
             history=PhantomProfile.of(target).deepCopy();PhantomEncounters.remember(this);
             if(phase()==2&&boon().equals("rbd:regeneration"))heal((float)(PhantomRules.REGEN.get()*(1+PhantomRules.BOON_STRENGTH.get())));
         }
@@ -123,18 +133,15 @@ public final class DespairPhantomEntity extends PathfinderMob implements Enemy,n
     }
     private void fight(ServerPlayer target){
         int tier=learningTier();double d=distanceToSqr(target);getLookControl().setLookAt(target,360,360);
+        combat.observe(target);
         if(attackCooldown>0)attackCooldown--;if(skillCooldown>0)skillCooldown--;
         if(onGround())airJumped=false;
-        double speed=1+tier*PhantomRules.LEARN_SPEED.get();
         boolean ranged=PhantomProfile.prefers(history,"ranged","melee");
         boolean blocks=PhantomProfile.number(history,"blocking")>0&&tier>0;
         boolean evasive=PhantomProfile.prefers(history,"evasion","melee")&&tier>1;
-        tactic=blocks&&target.isBlocking()?"flank":ranged&&tier>0?"strafe":evasive?"intercept":"pursuit";
-        Vec3 destination=target.position();
-        if(tactic.equals("intercept"))destination=destination.add(target.getDeltaMovement().scale(8+tier*2));
-        else if(tactic.equals("flank")){Vec3 side=target.getLookAngle().cross(new Vec3(0,1,0)).normalize().scale(2);destination=destination.add(side);}
-        else if(tactic.equals("strafe")&&d<100&&d>16){Vec3 side=target.position().subtract(position()).cross(new Vec3(0,1,0)).normalize().scale((tickCount/40%2==0?1:-1)*3);destination=position().add(side).add(target.position().subtract(position()).normalize());}
-        setSprinting(tier>0);getNavigation().moveTo(destination.x,destination.y,destination.z,speed);
+        // Probe unknown native weapons before choosing distance; remember actual projectile emission.
+        if(skillCooldown==0&&hasLineOfSight(target)&&d>9){PhantomEquipment.useWeapon(this,target);skillCooldown=PhantomRules.SKILL_TICKS.get();}
+        tactic=combat.move(target,tier,ranged,blocks,evasive);
         if(horizontalCollision&&onGround())getJumpControl().jump();
         if(tier>=2&&!onGround()&&!airJumped&&horizontalCollision&&getDeltaMovement().y<0.15){airJumped=PhantomEquipment.doubleJump(this);}
         if(tickCount%20==0){
@@ -149,7 +156,6 @@ public final class DespairPhantomEntity extends PathfinderMob implements Enemy,n
             if(blocks&&target.isBlocking())target.disableShield();
             attackCooldown=Math.max(1,(int)(PhantomRules.ATTACK_TICKS.get()/(1+tier*PhantomRules.LEARN_ATTACK.get())));
         }
-        if(skillCooldown==0&&hasLineOfSight(target)&&d>9){PhantomEquipment.useWeapon(this,target);skillCooldown=PhantomRules.SKILL_TICKS.get();}
     }
     public void enterSecondPhase(){
         if(phase()!=1||level().isClientSide)return;
@@ -202,6 +208,7 @@ public final class DespairPhantomEntity extends PathfinderMob implements Enemy,n
         ListTag inventory=new ListTag();for(ItemStack stack:inventoryCopy)inventory.add(stack.saveOptional(registryAccess()));tag.put("MirrorInventory",inventory);
         if(!curiosPending&&appliedCurios)savedCurios=PhantomEquipment.curiosSnapshot(this);
         tag.put("MirrorCurios",savedCurios.copy());tag.putString("Learned",history.toString());tag.putInt("AttackCooldown",attackCooldown);tag.putInt("SkillCooldown",skillCooldown);
+        ListTag ranged=new ListTag();for(String id:rangedWeapons)ranged.add(StringTag.valueOf(id));tag.put("RangedWeapons",ranged);
     }
     @Override public void readAdditionalSaveData(CompoundTag tag){
         super.readAdditionalSaveData(tag);quarry=tag.hasUUID("Quarry")?tag.getUUID("Quarry"):null;quarryName=tag.getString("QuarryName");
@@ -211,5 +218,6 @@ public final class DespairPhantomEntity extends PathfinderMob implements Enemy,n
         savedCurios=tag.getCompound("MirrorCurios").copy();curiosPending=true;
         if(tag.contains("Learned"))history=com.google.gson.JsonParser.parseString(tag.getString("Learned")).getAsJsonObject();
         attackCooldown=Math.max(0,tag.getInt("AttackCooldown"));skillCooldown=Math.max(0,tag.getInt("SkillCooldown"));applyBoon();updateBar();
+        rangedWeapons.clear();for(Tag id:tag.getList("RangedWeapons",Tag.TAG_STRING))rangedWeapons.add(id.getAsString());
     }
 }
