@@ -32,6 +32,22 @@ public final class PerformanceGameTests {
         h.succeed();
     }
     @GameTest(template="empty",batch="performance",timeoutTicks=100)
+    public static void rasterRefreshesBlocksLightAndActors(GameTestHelper h){
+        var observer=h.spawnWithNoFreeWill(EntityType.VILLAGER,2,2,1);
+        var other=h.spawnWithNoFreeWill(EntityType.VILLAGER,2,2,4);
+        var random=new Random(711);
+        var blocks=new net.minecraft.world.level.block.Block[]{Blocks.STONE,Blocks.AIR,Blocks.WATER,Blocks.LAVA,Blocks.OAK_FENCE,Blocks.OAK_STAIRS,Blocks.GLASS,Blocks.TORCH,Blocks.STONE_SLAB};
+        for(int round=0;round<32;round++){
+            for(int i=0;i<16;i++)h.setBlock(random.nextInt(8),random.nextInt(5),random.nextInt(8),blocks[random.nextInt(blocks.length)]);
+            observer.setYRot(random.nextFloat()*360);observer.setXRot(random.nextFloat()*180-90);
+            other.setInvisible(round%2==0);other.setPos(h.absoluteVec(new net.minecraft.world.phys.Vec3(random.nextInt(8),2,random.nextInt(8))));
+            int width=round%2==0?96:127,height=round%2==0?54:71;
+            h.getLevel().setDayTime(round%2==0?1000:18000);
+            h.assertTrue(Arrays.equals(PerceptionReference.raster(observer,width,height),Perception.raster(observer,width,height)),"fresh raster matches every pixel after block/fluid/light/actor changes, round "+round);
+        }
+        h.succeed();
+    }
+    @GameTest(template="empty",batch="performance",timeoutTicks=100)
     public static void autoCheckpointRejectsDangerAndPersistsRules(GameTestHelper h) throws Exception {
         var g=GameSession.current;
         var player=new net.neoforged.neoforge.common.util.FakePlayer(h.getLevel(),new com.mojang.authlib.GameProfile(UUID.randomUUID(),"AutoSaveTest"));

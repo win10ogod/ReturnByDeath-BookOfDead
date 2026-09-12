@@ -14,6 +14,7 @@ public final class MemoryArchive implements AutoCloseable {
     public static final Gson GSON = new Gson();
     private final Path root;
     private final dev.rbd.io.OrderedIo io;
+    private boolean closed;
     public MemoryArchive(Path root) throws IOException {
         this(root,0);
     }
@@ -23,8 +24,8 @@ public final class MemoryArchive implements AutoCloseable {
     }
     public void check() throws IOException {if(io!=null)io.check();}
     public void queueBudget(long bytes){if(io!=null)io.budget(bytes);}
-    public void flush() throws IOException {if(io!=null)io.flush();}
-    @Override public void close() throws IOException {if(io!=null)io.close();}
+    public void flush() throws IOException {if(io!=null){if(closed)io.check();else io.flush();}}
+    @Override public void close() throws IOException {if(io!=null)io.close();closed=true;}
     public Path root(){return root;}
     public Segment begin(String parent) throws IOException {return new Segment(parent);}
     public final class Segment implements AutoCloseable {
@@ -34,6 +35,7 @@ public final class MemoryArchive implements AutoCloseable {
         private BufferedWriter writer;
         private long count;
         private boolean closed;
+        private java.util.concurrent.CompletableFuture<Void> sealing;
         Segment(String parent) throws IOException {
             this.parent=parent;path=root.resolve("segments").resolve(id+".jsonl.gz");
             // Keep this constructor hook compatible with existing pack compression adapters.
@@ -56,8 +58,13 @@ public final class MemoryArchive implements AutoCloseable {
         private void write(MemoryFrame frame) throws IOException {writer.write(GSON.toJson(frame));writer.newLine();}
         public long count(){return count;}
         public void close() throws IOException {
-            if(closed)return;
-            if(io==null)seal();else dev.rbd.io.OrderedIo.await(io.submit(1,this::seal));
+            closeAsync();
+            if(sealing!=null)dev.rbd.io.OrderedIo.await(sealing);
+        }
+        /** Routine rotation may enqueue sealing; persistence and terminal close still drain it. */
+        public void closeAsync() throws IOException {
+            if(closed){check();return;}
+            if(io==null)seal();else sealing=io.submit(1,this::seal);
             closed=true;
         }
         private void seal() throws IOException {
@@ -68,6 +75,7 @@ public final class MemoryArchive implements AutoCloseable {
         }
     }
     public JsonObject sealBook(UUID soul,String name,String head,String branch,boolean authority,String coverage,String cause) throws IOException {
+        flush();
         JsonObject book=new JsonObject();String id=UUID.randomUUID().toString();
         book.addProperty("id",id);book.addProperty("life",UUID.randomUUID().toString());book.addProperty("soul",soul.toString());
         book.addProperty("name",name);book.addProperty("head",head);book.addProperty("branch",branch);book.addProperty("authority",authority);
@@ -86,6 +94,7 @@ public final class MemoryArchive implements AutoCloseable {
         private final Deque<SegmentRef> segments=new ArrayDeque<>();
         private BufferedReader reader;
         ReaderFrames(String head) throws IOException {
+            if(!head.isEmpty()&&!Files.isRegularFile(root.resolve("segments").resolve(UUID.fromString(head)+".json")))flush();
             Set<String> visited=new HashSet<>();
             while(!head.isEmpty()){
                 head=UUID.fromString(head).toString();if(!visited.add(head))throw new IOException("Cyclic memory prefix");

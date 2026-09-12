@@ -56,13 +56,13 @@ public final class MemoryRecorder implements AutoCloseable {
         t.segment.append(new MemoryFrame(e.level().getGameTime(),e.level().dimension().location().toString(),e.getX(),e.getEyeY(),e.getZ(),e.getYRot(),e.getXRot(),e.getHealth(),t.caption,List.copyOf(contacts),List.copyOf(t.sounds),source,w,h,pixels,png,body));
         t.damage=0;
         t.caption="";t.sounds.clear();
-        if(t.segment.count()>=RbdConfig.SEGMENT_FRAMES.get()){seal(e.getUUID());track(e);}
+        if(t.segment.count()>=RbdConfig.SEGMENT_FRAMES.get())rotate(e);
     }
     public void experienced(ServerPlayer reader,MemoryFrame frame) throws IOException {
         Track t=track(reader);
         t.segment.append(new MemoryFrame(reader.level().getGameTime(),frame.dimension(),frame.x(),frame.y(),frame.z(),frame.yaw(),frame.pitch(),frame.health(),frame.caption(),frame.contacts(),frame.sounds(),"EXPERIENCED_MEMORY/"+frame.visualSource(),frame.width(),frame.height(),frame.pixels(),frame.png(),frame.body()==null?null:frame.body().asExperience()));
         t.caption="";t.sounds.clear();
-        if(t.segment.count()>=RbdConfig.SEGMENT_FRAMES.get()){seal(reader.getUUID());track(reader);}
+        if(t.segment.count()>=RbdConfig.SEGMENT_FRAMES.get())rotate(reader);
     }
     public void clearImage(UUID id){Track t=tracks.get(id);if(t!=null){t.png="";t.imageTick=Long.MIN_VALUE;}}
     public void image(ServerPlayer actor,int width,int height,String png) throws IOException {
@@ -81,6 +81,12 @@ public final class MemoryRecorder implements AutoCloseable {
         Track t=tracks.remove(id);var heads=game.branch.object("heads");
         if(t!=null){t.segment.close();heads.addProperty(id.toString(),t.segment.id);}
         return heads.has(id.toString())?heads.get(id.toString()).getAsString():"";
+    }
+    private void rotate(LivingEntity actor) throws IOException {
+        Track t=tracks.remove(actor.getUUID());
+        t.segment.closeAsync();
+        game.branch.object("heads").addProperty(actor.getUUID().toString(),t.segment.id);
+        track(actor);
     }
     public JsonObject death(LivingEntity e,net.minecraft.world.damagesource.DamageSource damageSource) throws IOException {
         String cause=damageSource.getMsgId();Track t=track(e);t.damageType=cause;

@@ -34,6 +34,28 @@ public final class AsyncMemorySelfTest {
                 check(reader.next().body().terminal(),"terminal frame preserved after draining");check(reader.next()==null,"exact frame count");
             }
         }finally{try(var paths=Files.walk(root)){for(var p:paths.sorted(Comparator.reverseOrder()).toList())Files.delete(p);}}
-        System.out.println("AsyncMemorySelfTest: 201 exact frames, mutable input isolation, oversize backpressure, prefix ordering and I/O failure propagation PASS");
+        rotationBarrier();
+        System.out.println("AsyncMemorySelfTest: exact frames, mutable input isolation, oversize backpressure, deferred rotation, durable prefix ordering and I/O failure propagation PASS");
+    }
+    private static void rotationBarrier() throws Exception {
+        var root=Files.createTempDirectory("rbd-rotation-test-");var archive=new MemoryArchive(root,1048576);
+        var release=new CountDownLatch(1);var entered=new CountDownLatch(1);var readerThread=Executors.newSingleThreadExecutor();
+        try {
+            var field=MemoryArchive.class.getDeclaredField("io");field.setAccessible(true);var queue=(OrderedIo)field.get(archive);
+            queue.submit(1,()->{entered.countDown();release.await();});entered.await();
+            var first=archive.begin("");
+            first.append(new MemoryFrame(1,"minecraft:overworld",0,0,0,0,0,20,"before rotation",List.of(),List.of(),"TEST",1,1,new int[]{0xFF123456},""));
+            first.closeAsync();
+            var next=archive.begin(first.id);next.append(new MemoryFrame(2,"minecraft:overworld",0,0,0,0,0,20,"after rotation",List.of(),List.of(),"TEST",1,1,new int[]{0xFFABCDEF},""));next.closeAsync();
+            check(!Files.exists(root.resolve("segments").resolve(first.id+".json")),"rotation returns while durable work is still pending");
+            var read=readerThread.submit(()->{try(var reader=archive.reader(next.id)){check(reader.next().pixels()[0]==0xFF123456,"rotated prefix intact");check(reader.next().pixels()[0]==0xFFABCDEF,"following segment intact");check(reader.next()==null,"no dropped or duplicated rotated frames");return true;}});
+            try{read.get(100,TimeUnit.MILLISECONDS);throw new AssertionError("reader exposed an unsealed prefix");}catch(TimeoutException expected){}
+            release.countDown();check(read.get(3,TimeUnit.SECONDS),"reader drains deferred seals");
+            archive.close();archive.flush(); // World saves after a transition may flush an already closed archive.
+            check(Files.isRegularFile(root.resolve("segments").resolve(first.id+".json")),"durable prefix metadata exists after flush");
+        } finally {
+            release.countDown();archive.close();readerThread.shutdownNow();
+            try(var paths=Files.walk(root)){for(var p:paths.sorted(Comparator.reverseOrder()).toList())Files.delete(p);}
+        }
     }
 }
