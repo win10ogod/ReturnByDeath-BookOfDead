@@ -5,6 +5,8 @@ import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.neoforge.registries.*;
 public final class ModContent {
+    public static final DeferredRegister<net.minecraft.world.entity.EntityType<?>> ENTITIES=DeferredRegister.create(Registries.ENTITY_TYPE,RbdMod.ID);
+    public static final DeferredHolder<net.minecraft.world.entity.EntityType<?>,net.minecraft.world.entity.EntityType<dev.rbd.phantom.DespairPhantomEntity>> PHANTOM=ENTITIES.register("despair_phantom",()->net.minecraft.world.entity.EntityType.Builder.of(dev.rbd.phantom.DespairPhantomEntity::new,net.minecraft.world.entity.MobCategory.MONSTER).sized(0.6f,1.95f).clientTrackingRange(12).updateInterval(1).fireImmune().build("rbd:despair_phantom"));
     public static final DeferredRegister.Items ITEMS=DeferredRegister.createItems(RbdMod.ID);
     public static final DeferredRegister.Blocks BLOCKS=DeferredRegister.createBlocks(RbdMod.ID);
     public static final DeferredBlock<ArchiveShelfBlock> SHELF=BLOCKS.register("archive_shelf",()->new ArchiveShelfBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.DEEPSLATE_TILES).strength(-1,3600000)));

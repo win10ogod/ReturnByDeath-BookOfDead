@@ -55,6 +55,6 @@ public final class RbdConfig {
     public static final Setting<Boolean> RETURN_ECHOES=WorldRules.bool("rbdReturnEchoes",()->true);
     public static final Setting<Double> VISUAL_INTENSITY=WorldRules.decimal("rbdVisualIntensity",()->0.8,0,1);
     public static final Setting<Double> AUDIO_INTENSITY=WorldRules.decimal("rbdBodySoundIntensity",()->0.65,0,1);
-    public static void initialize(){WorldRules.initialized=true;}
+    public static void initialize(){dev.rbd.phantom.PhantomRules.initialize();WorldRules.initialized=true;}
     private RbdConfig(){}
 }

@@ -16,7 +16,9 @@
     "ConnectedJoinMixin",
     "PausedCommandMixin",
     "ConfigurationConnectionAccess",
-    "WorldRecoveryMixin"
+    "WorldRecoveryMixin",
+    "PhantomDeathMixin",
+    "PhantomCuriosMixin"
   ],
   "client": [
     "WorldOpenMixin",

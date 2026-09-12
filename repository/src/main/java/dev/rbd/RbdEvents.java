@@ -74,6 +74,7 @@ public final class RbdEvents {
         var game=GameSession.current;if(game==null)return;
         try{
             game.tick();
+            dev.rbd.phantom.PhantomEncounters.tick(game);
             if(!game.transitioning&&!game.returnPending()&&e.getServer().getTickCount()%RbdConfig.MIASMA_INTERVAL.get()==0){
                 double range=RbdConfig.MIASMA_RANGE.get();
                 for(ServerLevel level:game.server.getAllLevels())for(var entity:level.getAllEntities()){
@@ -97,6 +98,9 @@ public final class RbdEvents {
             game.death(e.getEntity(),e.getSource());
             if(game.isHolder(e.getEntity().getUUID())){e.setCanceled(true);e.getEntity().setHealth(1);}
         }catch(Exception ex){fault(game,ex);}
+    }
+    @SubscribeEvent(priority=EventPriority.LOWEST) public void phantomDrops(LivingDropsEvent event){
+        if(event.getEntity() instanceof dev.rbd.phantom.DespairPhantomEntity)event.getDrops().clear();
     }
     @SubscribeEvent public void advancement(AdvancementEvent.AdvancementEarnEvent e){
         var game=GameSession.current;if(game!=null&&game.isHolder(e.getEntity().getUUID())){
