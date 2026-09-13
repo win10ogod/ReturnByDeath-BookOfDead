@@ -29,7 +29,7 @@ public final class MemoryRecorder implements AutoCloseable {
     public void joined(LivingEntity actor){observersChanged|=observed.add(actor);}
     public void left(LivingEntity actor) throws IOException {
         observersChanged|=observed.remove(actor);Track track=tracks.get(actor.getUUID());
-        if(track!=null&&track.actor==actor)seal(actor.getUUID());
+        if(track!=null&&track.actor==actor)seal(actor.getUUID(),false);
     }
     private Track track(LivingEntity e) throws IOException {
         Track t=tracks.get(e.getUUID());if(t!=null){t.actor=e;return t;}
@@ -44,7 +44,7 @@ public final class MemoryRecorder implements AutoCloseable {
             if(e.isRemoved()){observersChanged|=observed.remove(e);continue;}
             if(e.isAlive()&&Perception.recorded(e))record(e,false);
         }
-        for(UUID id:List.copyOf(tracks.keySet()))if(tracks.get(id).actor.isRemoved())seal(id);
+        for(UUID id:List.copyOf(tracks.keySet()))if(tracks.get(id).actor.isRemoved())seal(id,false);
     }
     public void record(LivingEntity e,boolean last) throws IOException {
         // While immersed, the reader sees only the presented memory, not contacts around their body.
@@ -72,7 +72,7 @@ public final class MemoryRecorder implements AutoCloseable {
         t.damage=0;
         t.caption="";t.sounds.clear();
         if(destination.segment.count()>=RbdConfig.SEGMENT_FRAMES.get())rotate(destination.actor);
-        if(e.isRemoved()&&destination.actor==e)seal(e.getUUID());
+        if(e.isRemoved()&&destination.actor==e)seal(e.getUUID(),false);
     }
     public void experienced(ServerPlayer reader,MemoryFrame frame) throws IOException {
         boolean ending=frame.body()!=null&&(frame.body().terminal()||frame.body().rememberedEnding());
@@ -86,9 +86,10 @@ public final class MemoryRecorder implements AutoCloseable {
     }
     public void clearImage(UUID id){Track t=tracks.get(id);if(t!=null){t.png="";t.imageTick=Long.MIN_VALUE;}}
     public void image(ServerPlayer actor,int width,int height,String png) throws IOException {
-        byte[] data=java.util.Base64.getDecoder().decode(png);
-        if(width<1||height<1||(long)width*height>64000000L||data.length<24||java.nio.ByteBuffer.wrap(data).getLong()!=0x89504E470D0A1A0AL||java.nio.ByteBuffer.wrap(data).getInt(16)!=width||java.nio.ByteBuffer.wrap(data).getInt(20)!=height)throw new IOException("Invalid rendered memory image");
-        Track t=track(actor);t.width=width;t.height=height;t.png=png;t.imageTick=game.server.getTickCount();
+        image(actor,dev.rbd.network.PreparedImage.validate(width,height,png));
+    }
+    public void image(ServerPlayer actor,dev.rbd.network.PreparedImage image) throws IOException {
+        Track t=track(actor);t.width=image.width();t.height=image.height();t.png=image.png();t.imageTick=game.server.getTickCount();
     }
     public void caption(LivingEntity e,String caption) throws IOException {if(!game.reading(e.getUUID()))track(e).caption+=caption+"\n";}
     public void hurt(LivingEntity e,String type,float damage) throws IOException {Track t=track(e);t.damageType=type;t.damage+=damage;}
@@ -98,8 +99,13 @@ public final class MemoryRecorder implements AutoCloseable {
             t.sounds.add(new MemoryFrame.Sound(sound,(float)Math.max(0,volume*(1-t.actor.position().distanceTo(pos)/Math.max(RbdConfig.SOUND_RANGE.get(),volume*RbdConfig.SOUND_RANGE.get()))),pitch));
     }
     public String seal(UUID id) throws IOException {
+        return seal(id,true);
+    }
+    /** Unloading enqueues the seal; death, readers and world persistence still await durable data. */
+    private String seal(UUID id,boolean durable) throws IOException {
         Track t=tracks.remove(id);var heads=game.branch.object("heads");
-        if(t!=null){t.segment.close();heads.addProperty(id.toString(),t.segment.id);}
+        if(t!=null){t.segment.closeAsync();heads.addProperty(id.toString(),t.segment.id);}
+        if(durable)game.archive.flush();
         return heads.has(id.toString())?heads.get(id.toString()).getAsString():"";
     }
     private void rotate(LivingEntity actor) throws IOException {
@@ -119,5 +125,5 @@ public final class MemoryRecorder implements AutoCloseable {
         if(!game.isHolder(e.getUUID()))game.branch.object("visibleBooks").addProperty(book.get("id").getAsString(),true);
         return book;
     }
-    public void close() throws IOException {for(UUID id:List.copyOf(tracks.keySet()))seal(id);}
+    public void close() throws IOException {for(UUID id:List.copyOf(tracks.keySet()))seal(id,false);game.archive.flush();}
 }

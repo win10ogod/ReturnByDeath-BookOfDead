@@ -12,6 +12,37 @@ import java.util.*;
 @GameTestHolder("rbd")
 @PrefixGameTestTemplate(false)
 public final class RbdGameTests {
+    @GameTest(template="empty",batch="memory_lifecycle",timeoutTicks=100)
+    public static void unloadDoesNotWaitForArchiveAndStillPersistsPrefix(GameTestHelper helper)throws Exception{
+        var game=GameSession.current;
+        var actor=new ReentrantWitness(helper.getLevel());actor.setPos(helper.absoluteVec(new net.minecraft.world.phys.Vec3(2,1,2)));
+        game.recorder.caption(actor,"before unload");game.recorder.record(actor,false);game.archive.flush();
+        var field=MemoryArchive.class.getDeclaredField("io");field.setAccessible(true);
+        var queue=(dev.rbd.io.OrderedIo)field.get(game.archive);
+        var entered=new java.util.concurrent.CountDownLatch(1);var release=new java.util.concurrent.CountDownLatch(1);
+        var expired=new java.util.concurrent.atomic.AtomicBoolean();
+        var timer=java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
+        try{
+            queue.submit(1,()->{entered.countDown();release.await();});entered.await();
+            // A deadline prevents an old implementation from hanging the native test server.
+            timer.schedule(()->{expired.set(true);release.countDown();},500,java.util.concurrent.TimeUnit.MILLISECONDS);
+            game.recorder.left(actor);
+            helper.assertTrue(!expired.get(),"entity unload returns while archive writer is deliberately blocked");
+            String head=game.branch.object("heads").get(actor.getUUID().toString()).getAsString();
+            helper.assertTrue(!java.nio.file.Files.exists(game.archive.root().resolve("segments").resolve(head+".json")),"unload queued the seal instead of waiting for disk");
+            release.countDown();
+            // The same persistence barrier used by an ordinary world save must finish the seal.
+            game.archive.flush();
+            try(var reader=game.archive.reader(head)){
+                var frame=reader.next();helper.assertTrue(frame!=null&&frame.caption().equals("before unload\n")&&reader.next()==null,"deferred seal keeps every frame and its durable prefix");
+            }
+            game.recorder.joined(actor);game.recorder.caption(actor,"after rejoin");game.recorder.record(actor,false);
+            try(var reader=game.archive.reader(game.recorder.seal(actor.getUUID()))){
+                helper.assertTrue(reader.next().caption().equals("before unload\n")&&reader.next().caption().equals("after rejoin\n")&&reader.next()==null,"same UUID resumes the original memory without loss or duplication");
+            }
+        }finally{release.countDown();timer.shutdownNow();game.archive.flush();game.recorder.left(actor);}
+        helper.succeed();
+    }
     /** A world read can pump chunk-wait tasks, including entity removal, before returning. */
     private static final class ReentrantWitness extends net.minecraft.world.entity.npc.Villager {
         Runnable duringPerception;

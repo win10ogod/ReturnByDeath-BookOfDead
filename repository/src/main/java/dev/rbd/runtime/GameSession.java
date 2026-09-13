@@ -30,6 +30,8 @@ public final class GameSession implements AutoCloseable {
     public boolean transitioning;
     public String queuedMilestone;
     private final Map<UUID,dev.rbd.network.ImageUpload> uploads=new HashMap<>();
+    private final Map<UUID,dev.rbd.network.AsyncImageUpload> asyncUploads=new HashMap<>();
+    private volatile boolean imagesClosed;
     public final Map<UUID,Reading> readings=new java.util.concurrent.ConcurrentHashMap<>();
     public static final class Reading implements AutoCloseable {
         final String id=UUID.randomUUID().toString();final JsonObject book;final MemoryArchive.ReaderFrames reader;
@@ -132,6 +134,7 @@ public final class GameSession implements AutoCloseable {
     public void transition(String operation,JsonObject death) throws IOException {
         if(transitioning)throw new IOException("Return already in progress");
         saveGuard.check();
+        closeImageReceivers();
         recorder.close();
         archive.close();
         if(operation.equals("CAPTURE")){autoCheckpoint.reset();branch.json.addProperty("autoCheckpointElapsed",0);branch.setDirty();}
@@ -233,6 +236,25 @@ public final class GameSession implements AutoCloseable {
         Reading r=readings.remove(p.getUUID());if(r!=null){r.close();var msg=RbdNetwork.message("end");msg.addProperty("session",r.id);msg.addProperty("completed",completed);RbdNetwork.send(p,msg);}
     }
     public boolean reading(UUID who){return readings.containsKey(who);}
+    /** Network threads enqueue images here; mutable world access is restricted to the completion task. */
+    public void enqueueImage(ServerPlayer player,JsonObject message,java.util.function.Consumer<Throwable> acknowledge){
+        synchronized(asyncUploads){
+            if(imagesClosed){acknowledge.accept(null);return;}
+            asyncUploads.computeIfAbsent(player.getUUID(),id->new dev.rbd.network.AsyncImageUpload()).accept(message,(image,error)->{
+                if(error!=null||image==null){acknowledge.accept(error);return;}
+                server.execute(()->{
+                    try{
+                        if(current==this&&!imagesClosed&&!transitioning&&!reading(player.getUUID())&&server.getPlayerList().getPlayer(player.getUUID())==player)
+                            recorder.image(player,image);
+                        acknowledge.accept(null);
+                    }catch(Exception failure){acknowledge.accept(failure);}
+                });
+            });
+        }
+    }
+    private void closeImageReceivers(){
+        synchronized(asyncUploads){imagesClosed=true;asyncUploads.values().forEach(dev.rbd.network.AsyncImageUpload::close);asyncUploads.clear();}
+    }
     public void message(ServerPlayer p,JsonObject msg) throws IOException {
         if(transitioning)return;
         String kind=msg.get("kind").getAsString();
@@ -252,6 +274,9 @@ public final class GameSession implements AutoCloseable {
         if(kind.equals("page")){ArchiveLibrary.page(this,p,msg.get("direction").getAsInt());return;}
         if(kind.equals("select_book"))ArchiveLibrary.select(this,p,msg.get("id").getAsString());
     }
-    public void disconnected(ServerPlayer player) throws IOException {endReading(player);recorder.seal(player.getUUID());uploads.remove(player.getUUID());}
-    public void close() throws IOException {uploads.clear();for(var reading:readings.values())reading.close();readings.clear();recorder.close();archive.close();saveSoul();}
+    public void disconnected(ServerPlayer player) throws IOException {
+        synchronized(asyncUploads){var receiver=asyncUploads.remove(player.getUUID());if(receiver!=null)receiver.close();}
+        endReading(player);recorder.seal(player.getUUID());uploads.remove(player.getUUID());
+    }
+    public void close() throws IOException {closeImageReceivers();uploads.clear();for(var reading:readings.values())reading.close();readings.clear();recorder.close();archive.close();saveSoul();}
 }

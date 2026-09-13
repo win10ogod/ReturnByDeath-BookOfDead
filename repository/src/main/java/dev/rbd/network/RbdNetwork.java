@@ -13,14 +13,27 @@ public final class RbdNetwork {
     public static void register(RegisterPayloadHandlersEvent event){
         event.registrar("7").executesOn(net.neoforged.neoforge.network.registration.HandlerThread.NETWORK)
             .playToClient(ImageAckPayload.TYPE,ImageAckPayload.CODEC,(payload,context)->ClientReceiver.ack(payload));
-        event.registrar("7").playBidirectional(MessagePayload.TYPE,MessagePayload.CODEC,(payload,context)->{
+        event.registrar("7").executesOn(net.neoforged.neoforge.network.registration.HandlerThread.NETWORK).playBidirectional(MessagePayload.TYPE,MessagePayload.CODEC,(payload,context)->{
+            // Login/respawn packets can precede construction of the client player on its main thread.
+            if(context.flow()==net.minecraft.network.protocol.PacketFlow.CLIENTBOUND){context.enqueueWork(()->ClientReceiver.receive(payload.json()));return;}
             if(context.player() instanceof ServerPlayer player){
-                JsonObject message=null;boolean accepted=false;
-                try{message=JsonParser.parseString(payload.json()).getAsJsonObject();if(GameSession.current!=null){GameSession.current.message(player,message);accepted=true;}}
-                catch(Exception e){player.displayClientMessage(net.minecraft.network.chat.Component.literal("RBD: "+e.getMessage()),true);}
-                finally{if(message!=null&&"image_chunk".equals(message.get("kind").getAsString())&&message.has("id")&&message.has("part"))
-                    PacketDistributor.sendToPlayer(player,new ImageAckPayload(message.get("id").getAsString(),message.get("part").getAsInt(),accepted));}
-            }else ClientReceiver.receive(payload.json());
+                try{
+                    var message=JsonParser.parseString(payload.json()).getAsJsonObject();
+                    if("image_chunk".equals(message.get("kind").getAsString())){
+                        String id=message.get("id").getAsString();int part=message.get("part").getAsInt();
+                        var game=GameSession.current;
+                        if(game==null){PacketDistributor.sendToPlayer(player,new ImageAckPayload(id,part,false));return;}
+                        game.enqueueImage(player,message,error->{
+                            PacketDistributor.sendToPlayer(player,new ImageAckPayload(id,part,error==null));
+                            if(error!=null)context.enqueueWork(()->player.displayClientMessage(net.minecraft.network.chat.Component.literal("RBD: "+error.getMessage()),true));
+                        });
+                    }else context.enqueueWork(()->{
+                        // A connected return may replace the player while this control packet is queued.
+                        try{if(GameSession.current!=null&&context.player() instanceof ServerPlayer currentPlayer)GameSession.current.message(currentPlayer,message);}
+                        catch(Exception error){player.displayClientMessage(net.minecraft.network.chat.Component.literal("RBD: "+error.getMessage()),true);}
+                    });
+                }catch(Exception error){context.enqueueWork(()->player.displayClientMessage(net.minecraft.network.chat.Component.literal("RBD: "+error.getMessage()),true));}
+            }
         });
     }
     /** Class resolution is deferred until an actual clientbound payload is handled. */
