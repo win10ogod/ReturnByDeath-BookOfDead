@@ -28,3 +28,6 @@ IMPLEMENTATION_STATUS*
 NOTICES*
 *.mp4
 *.mkv
+
+# Transient, per-connection memory image staging
+**/.rbd-upload/

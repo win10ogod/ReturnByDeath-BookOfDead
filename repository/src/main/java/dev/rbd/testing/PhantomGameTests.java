@@ -43,21 +43,36 @@ public final class PhantomGameTests {
     @GameTest(template="empty",batch="phantom",timeoutTicks=120)
     public static void phantomAuraUsesSphereAndExemptsOnlyItsTarget(GameTestHelper h){
         var target=new net.neoforged.neoforge.common.util.FakePlayer(h.getLevel(),new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(),"PhantomTest"));var boss=h.spawnWithNoFreeWill(ModContent.PHANTOM.get(),2,1,2);boss.mirror(target);target.setPos(boss.position());
-        // This radius extends outside the tiny template. Load its destination chunks before
-        // moving fixtures, and allow the entity manager to publish their section visibility.
-        h.getLevel().getChunk(net.minecraft.core.BlockPos.containing(boss.getX()+32.1,boss.getY(),boss.getZ()));
-        h.getLevel().getChunk(net.minecraft.core.BlockPos.containing(boss.getX()+24,boss.getY(),boss.getZ()+24));
-        var inside=h.spawnWithNoFreeWill(EntityType.PIG,3,1,2);inside.setPos(boss.getX()+31.9,boss.getY(),boss.getZ());
-        var outside=h.spawnWithNoFreeWill(EntityType.PIG,4,1,2);outside.setPos(boss.getX()+32.1,boss.getY(),boss.getZ());
-        var diagonal=h.spawnWithNoFreeWill(EntityType.COW,5,1,2);diagonal.setPos(boss.getX()+24,boss.getY(),boss.getZ()+24);
-        h.runAfterDelay(2,()->{
-        h.assertTrue(com.google.common.collect.Lists.newArrayList(h.getLevel().getAllEntities()).contains(inside),"radius fixture is present in the loaded entity index");
-        boss.enterSecondPhase();var tag=new CompoundTag();boss.saveWithoutId(tag);tag.putInt("AuraDelay",0);boss.load(tag);
-        boss.pulseAura();h.assertTrue(inside.isRemoved(),"within default 32 blocks is killed");
-        h.assertTrue(outside.isAlive()&&diagonal.isAlive(),"outside radius and box-only diagonal excluded");h.assertTrue(target.isAlive()&&boss.isAlive(),"locked target and executing phantom exempt");
-        outside.discard();diagonal.discard();boss.discard();h.succeed();
-        });
+        // The aura extends beyond the GameTest template. A synchronous getChunk call alone
+        // does not keep those chunks visible in the entity index on a fresh CI world.
+        var forced=new java.util.HashSet<net.minecraft.world.level.ChunkPos>();
+        for(var pos:java.util.List.of(
+                net.minecraft.core.BlockPos.containing(boss.getX()+31.9,boss.getY(),boss.getZ()),
+                net.minecraft.core.BlockPos.containing(boss.getX()+32.1,boss.getY(),boss.getZ()),
+                net.minecraft.core.BlockPos.containing(boss.getX()+24,boss.getY(),boss.getZ()+24))){
+            var chunk=new net.minecraft.world.level.ChunkPos(pos);
+            if(!h.getLevel().getForcedChunks().contains(chunk.toLong())){
+                h.getLevel().setChunkForced(chunk.x,chunk.z,true);forced.add(chunk);
+            }
+            h.getLevel().getChunk(pos);
+        }
+        Runnable cleanup=()->forced.forEach(chunk->h.getLevel().setChunkForced(chunk.x,chunk.z,false));
+        h.runAtTickTime(119,cleanup);
+        var inside=h.spawnWithNoFreeWill(EntityType.PIG,3,1,2);inside.setNoGravity(true);inside.setPos(boss.getX()+31.9,boss.getY(),boss.getZ());
+        var outside=h.spawnWithNoFreeWill(EntityType.PIG,4,1,2);outside.setNoGravity(true);outside.setPos(boss.getX()+32.1,boss.getY(),boss.getZ());
+        var diagonal=h.spawnWithNoFreeWill(EntityType.COW,5,1,2);diagonal.setNoGravity(true);diagonal.setPos(boss.getX()+24,boss.getY(),boss.getZ()+24);
+        h.startSequence().thenWaitUntil(()->{
+            var loaded=com.google.common.collect.Lists.newArrayList(h.getLevel().getAllEntities());
+            h.assertTrue(loaded.containsAll(java.util.List.of(inside,outside,diagonal)),"all radius fixtures are present in the loaded entity index");
+        }).thenExecute(()->{
+            try{
+                boss.enterSecondPhase();var tag=new CompoundTag();boss.saveWithoutId(tag);tag.putInt("AuraDelay",0);boss.load(tag);
+                boss.pulseAura();h.assertTrue(inside.isRemoved(),"within default 32 blocks is killed");
+                h.assertTrue(outside.isAlive()&&diagonal.isAlive(),"outside radius and box-only diagonal excluded");h.assertTrue(target.isAlive()&&boss.isAlive(),"locked target and executing phantom exempt");
+            }finally{outside.discard();diagonal.discard();boss.discard();cleanup.run();}
+        }).thenSucceed();
     }
+
     @GameTest(template="empty",batch="phantom",timeoutTicks=100)
     public static void phantomLearningAndRulesPersist(GameTestHelper h){
         var history=new com.google.gson.JsonObject();h.assertTrue(PhantomProfile.tier(history)==0,"unobserved novice starts without advanced tactics");history.addProperty("level",60);history.addProperty("ranged",100);

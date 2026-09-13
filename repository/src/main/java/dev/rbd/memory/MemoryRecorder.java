@@ -16,6 +16,8 @@ public final class MemoryRecorder implements AutoCloseable {
     private static final class Track {
         LivingEntity actor;MemoryArchive.Segment segment;List<MemoryFrame.Sound> sounds=new ArrayList<>();
         String caption="";int[] pixels=new int[0];String png="";int width,height;long imageTick=Long.MIN_VALUE;
+        long lastVisualTick=Long.MIN_VALUE;
+        long lastExperienceTick=Long.MIN_VALUE;
         String damageType="";double damage;
         Track(LivingEntity actor){this.actor=actor;}
     }
@@ -34,6 +36,8 @@ public final class MemoryRecorder implements AutoCloseable {
         t.segment=game.archive.begin(parent);tracks.put(e.getUUID(),t);return t;
     }
     public void tick() throws IOException {
+        // Do not scan contacts, rasterize, or append continuation/body frames between configured samples.
+        if(!dev.rbd.core.RecordingCadence.due(game.server.overworld().getGameTime(),RbdConfig.RECORD_INTERVAL.get()))return;
         if(observersChanged){observers=observed.toArray(LivingEntity[]::new);observersChanged=false;}
         for(var e:observers){
             if(e.isRemoved()){observersChanged|=observed.remove(e);continue;}
@@ -44,23 +48,28 @@ public final class MemoryRecorder implements AutoCloseable {
     public void record(LivingEntity e,boolean last) throws IOException {
         // While immersed, the reader sees only the presented memory, not contacts around their body.
         if(game.reading(e.getUUID())&&!last)return;
-        Track t=track(e);int interval=RbdConfig.VISUAL_INTERVAL.get();
+        Track t=track(e);int interval=RbdConfig.captureInterval();long tick=e.level().getGameTime();
         List<MemoryFrame.Contact> contacts=Perception.contacts(e);for(var contact:contacts)game.learn(e.getUUID(),contact);
-        boolean image=t.segment.count()==0||game.server.getTickCount()%interval==0||last;
+        boolean image=t.segment.count()==0||dev.rbd.core.RecordingCadence.imageDue(tick,t.lastVisualTick,interval)||last;
         int[] pixels=new int[0];int w=0,h=0;String source="CONTINUATION",png="";
         if(image){
-            if(!t.png.isEmpty()&&game.server.getTickCount()-t.imageTick<=RbdConfig.VISUAL_INTERVAL.get()*2L){w=t.width;h=t.height;png=t.png;source="CLIENT_FIRST_PERSON";}
+            t.lastVisualTick=tick;
+            if(!t.png.isEmpty()&&game.server.getTickCount()-t.imageTick<=interval*2L){w=t.width;h=t.height;png=t.png;source="CLIENT_FIRST_PERSON";}
             else {w=RbdConfig.RASTER_WIDTH.get();h=RbdConfig.RASTER_HEIGHT.get();pixels=Perception.raster(e,w,h);source="SERVER_SUBJECTIVE_RASTER";}
         }
         var body=new SomaticState(e.getMaxHealth(),e.getAirSupply(),e.getMaxAirSupply(),e.isUnderWater(),e.isOnFire(),e.getTicksFrozen(),e.fallDistance,t.damage,t.damageType,last);
-        t.segment.append(new MemoryFrame(e.level().getGameTime(),e.level().dimension().location().toString(),e.getX(),e.getEyeY(),e.getZ(),e.getYRot(),e.getXRot(),e.getHealth(),t.caption,List.copyOf(contacts),List.copyOf(t.sounds),source,w,h,pixels,png,body));
+        t.segment.append(new MemoryFrame(e.level().getGameTime(),e.level().dimension().location().toString(),e.getX(),e.getEyeY(),e.getZ(),e.getYRot(),e.getXRot(),e.getHealth(),t.caption,List.copyOf(contacts),List.copyOf(t.sounds),source,w,h,pixels,png,body,RbdConfig.RECORD_INTERVAL.get()));
         t.damage=0;
         t.caption="";t.sounds.clear();
         if(t.segment.count()>=RbdConfig.SEGMENT_FRAMES.get())rotate(e);
     }
     public void experienced(ServerPlayer reader,MemoryFrame frame) throws IOException {
+        boolean ending=frame.body()!=null&&(frame.body().terminal()||frame.body().rememberedEnding());
         Track t=track(reader);
-        t.segment.append(new MemoryFrame(reader.level().getGameTime(),frame.dimension(),frame.x(),frame.y(),frame.z(),frame.yaw(),frame.pitch(),frame.health(),frame.caption(),frame.contacts(),frame.sounds(),"EXPERIENCED_MEMORY/"+frame.visualSource(),frame.width(),frame.height(),frame.pixels(),frame.png(),frame.body()==null?null:frame.body().asExperience()));
+        long tick=reader.level().getGameTime();
+        if(!ending&&!dev.rbd.core.RecordingCadence.imageDue(tick,t.lastExperienceTick,RbdConfig.RECORD_INTERVAL.get()))return;
+        t.lastExperienceTick=tick;
+        t.segment.append(new MemoryFrame(reader.level().getGameTime(),frame.dimension(),frame.x(),frame.y(),frame.z(),frame.yaw(),frame.pitch(),frame.health(),frame.caption(),frame.contacts(),frame.sounds(),"EXPERIENCED_MEMORY/"+frame.visualSource(),frame.width(),frame.height(),frame.pixels(),frame.png(),frame.body()==null?null:frame.body().asExperience(),RbdConfig.RECORD_INTERVAL.get()));
         t.caption="";t.sounds.clear();
         if(t.segment.count()>=RbdConfig.SEGMENT_FRAMES.get())rotate(reader);
     }
@@ -86,14 +95,14 @@ public final class MemoryRecorder implements AutoCloseable {
         Track t=tracks.remove(actor.getUUID());
         t.segment.closeAsync();
         game.branch.object("heads").addProperty(actor.getUUID().toString(),t.segment.id);
-        track(actor);
+        track(actor).lastExperienceTick=t.lastExperienceTick;
     }
     public JsonObject death(LivingEntity e,net.minecraft.world.damagesource.DamageSource damageSource) throws IOException {
         String cause=damageSource.getMsgId();Track t=track(e);t.damageType=cause;
         SomaticState ending=new SomaticState(e.getMaxHealth(),e.getAirSupply(),e.getMaxAirSupply(),e.isUnderWater(),e.isOnFire(),e.getTicksFrozen(),e.fallDistance,t.damage,cause,true);
         record(e,true);String head=seal(e.getUUID());
         var book=game.archive.sealBook(e.getUUID(),Perception.name(e),head,game.branch.json.get("branch").getAsString(),game.isHolder(e.getUUID()),
-            "RECORDED_SINCE_OBSERVATION; POSE_20TPS; SUBJECTIVE_RASTER_EVERY_"+RbdConfig.VISUAL_INTERVAL.get()+"_TICKS; PREINSTALL_AND_UNLOADED_LIFE_NOT_AVAILABLE",cause);
+            "RECORDED_SINCE_OBSERVATION; STATE_AND_PERCEPTION_EVERY_"+RbdConfig.RECORD_INTERVAL.get()+"_TICKS; IMAGE_MIN_INTERVAL_"+RbdConfig.captureInterval()+"_TICKS; TERMINAL_STATE_ALWAYS_RECORDED; PREINSTALL_AND_UNLOADED_LIFE_NOT_AVAILABLE",cause);
         book.add("ending",MemoryArchive.GSON.toJsonTree(ending));
         dev.rbd.io.AtomicJson.write(game.archive.root().resolve("books").resolve(book.get("id").getAsString()+".json"),book);
         if(!game.isHolder(e.getUUID()))game.branch.object("visibleBooks").addProperty(book.get("id").getAsString(),true);

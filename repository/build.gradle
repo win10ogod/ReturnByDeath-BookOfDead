@@ -218,7 +218,7 @@ tasks.register('compileSelfTests', JavaCompile) {
     javaCompiler = javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(21) }
     options.release = 21
 }
-['CoreSelfTest', 'StorageSelfTest', 'SnapshotRetentionSelfTest', 'MortalitySelfTest', 'AuthoritySelfTest', 'PngSelfTest', 'ImageUploadSelfTest', 'AsyncMemorySelfTest', 'AutoCheckpointSelfTest'].each { testClass ->
+['CoreSelfTest', 'StorageSelfTest', 'SnapshotRetentionSelfTest', 'MortalitySelfTest', 'AuthoritySelfTest', 'PngSelfTest', 'ImageUploadSelfTest', 'SpoolingImageSenderSelfTest', 'AsyncMemorySelfTest', 'AutoCheckpointSelfTest'].each { testClass ->
     def checkTask = tasks.register(testClass.substring(0,1).toLowerCase()+testClass.substring(1), JavaExec) {
         dependsOn 'compileSelfTests'
         classpath = files(selfTestClasses) + sourceSets.main.runtimeClasspath

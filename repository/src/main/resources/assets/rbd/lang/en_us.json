@@ -42,7 +42,7 @@
   "gamerule.rbdMemoryRasterHeight": "RBD · Server perception image height",
   "gamerule.rbdMemoryRasterHeight.description": "Default: 54. Allowed: 9 to 1080. ",
   "gamerule.rbdMemoryImageIntervalTicks": "RBD · Memory image interval (ticks)",
-  "gamerule.rbdMemoryImageIntervalTicks.description": "Default: 1. Allowed: 1 to 1200. ",
+  "gamerule.rbdMemoryImageIntervalTicks.description": "Default: 1. Additional image spacing; effective capture interval is at least the memory scan and recording interval. Range: 1 to 1200.",
   "gamerule.rbdPerceptionDistance": "RBD · Visual perception range (blocks)",
   "gamerule.rbdPerceptionDistance.description": "Default: 32. Allowed: 4 to 256. ",
   "gamerule.rbdMiasmaSensingRange": "RBD · Miasma sensing range (blocks)",
@@ -252,5 +252,7 @@
   "gamerule.rbdCheckpointRetention": "Retained world checkpoints",
   "gamerule.rbdCheckpointRetention.description": "Default 1: retire older committed copies in the background after the new checkpoint is verified and the world reopens. Books and memories are preserved. Applies after the next save/return or world open.",
   "gamerule.rbdFailedWorldRetention": "Retained replaced-world backups",
-  "gamerule.rbdFailedWorldRetention.description": "Default 1: keep the most recent replaced world for recovery; 0 removes completed backups after a successful reopen. Incomplete transactions and fault evidence are preserved."
+  "gamerule.rbdFailedWorldRetention.description": "Default 1: keep the most recent replaced world for recovery; 0 removes completed backups after a successful reopen. Incomplete transactions and fault evidence are preserved.",
+  "gamerule.rbdMemoryRecordIntervalTicks": "RBD · Memory scan and recording interval (ticks)",
+  "gamerule.rbdMemoryRecordIntervalTicks.description": "Default: 100 (5 seconds at 20 TPS). Samples state, perception and images only at the configured interval; death still records the terminal state. Range: 1 to 2147483647."
 }

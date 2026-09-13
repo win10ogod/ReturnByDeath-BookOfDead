@@ -11,15 +11,23 @@ import java.util.zip.*;
 public final class RbdNetwork {
     private RbdNetwork(){}
     public static void register(RegisterPayloadHandlersEvent event){
-        event.registrar("6").playBidirectional(MessagePayload.TYPE,MessagePayload.CODEC,(payload,context)->{
+        event.registrar("7").executesOn(net.neoforged.neoforge.network.registration.HandlerThread.NETWORK)
+            .playToClient(ImageAckPayload.TYPE,ImageAckPayload.CODEC,(payload,context)->ClientReceiver.ack(payload));
+        event.registrar("7").playBidirectional(MessagePayload.TYPE,MessagePayload.CODEC,(payload,context)->{
             if(context.player() instanceof ServerPlayer player){
-                try{if(GameSession.current!=null)GameSession.current.message(player,JsonParser.parseString(payload.json()).getAsJsonObject());}
+                JsonObject message=null;boolean accepted=false;
+                try{message=JsonParser.parseString(payload.json()).getAsJsonObject();if(GameSession.current!=null){GameSession.current.message(player,message);accepted=true;}}
                 catch(Exception e){player.displayClientMessage(net.minecraft.network.chat.Component.literal("RBD: "+e.getMessage()),true);}
+                finally{if(message!=null&&"image_chunk".equals(message.get("kind").getAsString())&&message.has("id")&&message.has("part"))
+                    PacketDistributor.sendToPlayer(player,new ImageAckPayload(message.get("id").getAsString(),message.get("part").getAsInt(),accepted));}
             }else ClientReceiver.receive(payload.json());
         });
     }
     /** Class resolution is deferred until an actual clientbound payload is handled. */
-    private static final class ClientReceiver {static void receive(String json){dev.rbd.client.RbdClient.receive(JsonParser.parseString(json).getAsJsonObject());}}
+    private static final class ClientReceiver {
+        static void receive(String json){dev.rbd.client.RbdClient.receive(JsonParser.parseString(json).getAsJsonObject());}
+        static void ack(ImageAckPayload payload){dev.rbd.client.ClientRecorder.acknowledge(payload);}
+    }
     public static JsonObject message(String kind){var o=new JsonObject();o.addProperty("kind",kind);return o;}
     public static void send(ServerPlayer p,JsonObject message){PacketDistributor.sendToPlayer(p,new MessagePayload(message.toString()));}
     public static void sendLarge(ServerPlayer p,JsonObject message){

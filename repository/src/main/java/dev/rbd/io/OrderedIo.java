@@ -11,6 +11,7 @@ public final class OrderedIo implements AutoCloseable {
     private long pending;
     private boolean closed;
     private IOException failure;
+    private CompletableFuture<Void> asyncClose;
 
     public OrderedIo(String name,long budget) {
         if(budget<1)throw new IllegalArgumentException("Positive queue budget required");
@@ -44,6 +45,14 @@ public final class OrderedIo implements AutoCloseable {
         catch(ExecutionException e){throw e.getCause() instanceof IOException io?io:new IOException("Background memory I/O failed",e.getCause());}
     }
     public void flush() throws IOException {await(submit(1,()->{}));}
+    /** Detach an obsolete client encoder without making the render/logout thread drain its queue. */
+    public synchronized CompletableFuture<Void> closeAsync() {
+        if(asyncClose!=null)return asyncClose;
+        if(closed)return failure==null?CompletableFuture.completedFuture(null):CompletableFuture.failedFuture(failure);
+        closed=true;notifyAll();var completion=new CompletableFuture<Void>();asyncClose=completion;
+        worker.execute(()->{synchronized(this){if(failure!=null)completion.completeExceptionally(failure);else completion.complete(null);}});
+        worker.shutdown();return completion;
+    }
     @Override public void close() throws IOException {
         synchronized(this){if(closed){check();return;}}
         try{flush();}finally{synchronized(this){closed=true;notifyAll();}worker.shutdown();}

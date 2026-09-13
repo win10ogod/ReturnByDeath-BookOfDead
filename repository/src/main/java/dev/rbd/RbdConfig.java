@@ -13,6 +13,8 @@ public final class RbdConfig {
     public static final Setting<Integer> RASTER_WIDTH=WorldRules.integer("rbdMemoryRasterWidth",()->LegacyConfig.SPEC.isLoaded()?LegacyConfig.RASTER_WIDTH.get():LegacyConfig.RASTER_WIDTH.getDefault(),16,1920);
     public static final Setting<Integer> RASTER_HEIGHT=WorldRules.integer("rbdMemoryRasterHeight",()->LegacyConfig.SPEC.isLoaded()?LegacyConfig.RASTER_HEIGHT.get():LegacyConfig.RASTER_HEIGHT.getDefault(),9,1080);
     public static final Setting<Integer> VISUAL_INTERVAL=WorldRules.integer("rbdMemoryImageIntervalTicks",()->LegacyConfig.SPEC.isLoaded()?LegacyConfig.VISUAL_INTERVAL.get():LegacyConfig.VISUAL_INTERVAL.getDefault(),1,1200);
+    public static final Setting<Integer> RECORD_INTERVAL=WorldRules.integer("rbdMemoryRecordIntervalTicks",()->100,1,2147483647);
+    public static int captureInterval(){return Math.max(RECORD_INTERVAL.get(),VISUAL_INTERVAL.get());}
     public static final Setting<Integer> PERCEPTION_DISTANCE=WorldRules.integer("rbdPerceptionDistance",()->LegacyConfig.SPEC.isLoaded()?LegacyConfig.PERCEPTION_DISTANCE.get():LegacyConfig.PERCEPTION_DISTANCE.getDefault(),4,256);
     public static final Setting<Double> MIASMA_RANGE=WorldRules.decimal("rbdMiasmaSensingRange",()->LegacyConfig.SPEC.isLoaded()?LegacyConfig.MIASMA_RANGE.get():LegacyConfig.MIASMA_RANGE.getDefault(),1,256);
     public static final Setting<Double> DEATH_DWELL=WorldRules.decimal("rbdMemoryDeathDwellSeconds",()->LegacyConfig.SPEC.isLoaded()?LegacyConfig.DEATH_DWELL.get():LegacyConfig.DEATH_DWELL.getDefault(),0,30);

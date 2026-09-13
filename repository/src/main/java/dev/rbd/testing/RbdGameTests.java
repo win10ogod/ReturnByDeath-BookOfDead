@@ -12,6 +12,43 @@ import java.util.*;
 @GameTestHolder("rbd")
 @PrefixGameTestTemplate(false)
 public final class RbdGameTests {
+    @GameTest(template="empty",batch="cadence",timeoutTicks=100)
+    public static void experiencedMemorySamplesRelativeToPresentationAndKeepsEnding(GameTestHelper helper)throws Exception{
+        var player=new net.neoforged.neoforge.common.util.FakePlayer(helper.getLevel(),new com.mojang.authlib.GameProfile(UUID.randomUUID(),"ReadingCadence"));
+        var game=GameSession.current;
+        for(int n=0;n<10;n++)game.recorder.experienced(player,new MemoryFrame(n,"minecraft:overworld",0,0,0,0,0,20,"sample "+n,List.of(),List.of(),"TEST",1,1,new int[]{-1},""));
+        var ending=new SomaticState(20,0,300,true,false,0,0,20,"drown",true);
+        game.recorder.experienced(player,new MemoryFrame(10,"minecraft:overworld",0,0,0,0,0,0,"ending",List.of(),List.of(),"TEST",1,1,new int[]{-1},"",ending));
+        try(var reader=game.archive.reader(game.recorder.seal(player.getUUID()))){
+            var first=reader.next();var last=reader.next();
+            helper.assertTrue(first!=null&&first.caption().equals("sample 0"),"first presented memory is retained even off the global sampling phase");
+            helper.assertTrue(first.sampleTicks()==100,"experienced memory uses the configured recording duration");
+            helper.assertTrue(last!=null&&last.body().rememberedEnding(),"ending is retained even before the next sample");
+            helper.assertTrue(reader.next()==null,"rapid presentation acknowledgements do not write every frame");
+        }helper.succeed();
+    }
+    @GameTest(template="empty",batch="cadence",timeoutTicks=260)
+    public static void memorySamplingWaitsForConfiguredTicksAndPreservesDeath(GameTestHelper helper){
+        var game=GameSession.current;
+        helper.assertTrue(RbdConfig.RECORD_INTERVAL.get()==100,"new recording interval defaults to 100 ticks");
+        var actor=helper.spawnWithNoFreeWill(EntityType.VILLAGER,2,1,2);actor.setNoGravity(true);actor.setCustomName(Component.literal("Cadence witness"));
+        helper.runAfterDelay(209,()->{
+            try {
+                actor.hurt(helper.getLevel().damageSources().genericKill(),Float.MAX_VALUE);
+                var book=game.archive.books().stream().filter(b->b.get("soul").getAsString().equals(actor.getUUID().toString())).findFirst().orElseThrow();
+                int regular=0,terminal=0;
+                try(var reader=game.archive.reader(book.get("head").getAsString())){
+                    MemoryFrame frame;while((frame=reader.next())!=null){
+                        helper.assertTrue(frame.sampleTicks()==100,"recorded timing survives serialization");
+                        if(frame.body()!=null&&frame.body().terminal())terminal++;
+                        else {regular++;helper.assertTrue(Math.floorMod(frame.tick(),100)==0,"no per-tick state/continuation records between samples");}
+                    }
+                }
+                helper.assertTrue(regular>=2&&regular<=3,"209 game ticks produce only 2 or 3 regular samples");
+                helper.assertTrue(terminal==1,"death outside sampling schedule is still captured once");helper.succeed();
+            }catch(Exception failure){helper.fail(failure.toString());}
+        });
+    }
     @GameTest(template="empty",timeoutTicks=100)
     public static void interruptedReturnRecoversBeforeWorldLock(GameTestHelper helper) throws Exception {
         var root=java.nio.file.Files.createTempDirectory("rbd-world-open-");

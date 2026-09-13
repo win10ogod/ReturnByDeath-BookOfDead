@@ -177,7 +177,7 @@ public final class GameSession implements AutoCloseable {
                 }
                 endReading(p,true);continue;}
             reading.last=frame;reading.awaiting=true;reading.sequence++;
-            double dwell=frame.body()!=null&&(frame.body().terminal()||frame.body().rememberedEnding())?RbdConfig.DEATH_DWELL.get():0;
+            double dwell=frame.body()!=null&&(frame.body().terminal()||frame.body().rememberedEnding())?RbdConfig.DEATH_DWELL.get():Math.max(1,frame.sampleTicks())/20.0;
             reading.ackAfterNanos=System.nanoTime()+(long)(dwell*1_000_000_000L);
             var msg=RbdNetwork.message("frame");msg.addProperty("session",reading.id);msg.addProperty("sequence",reading.sequence);msg.addProperty("dwell",dwell);msg.add("frame",MemoryArchive.GSON.toJsonTree(frame));RbdNetwork.sendLarge(p,msg);
         }

@@ -47,7 +47,7 @@ public final class MemoryArchive implements AutoCloseable {
             if(io==null)write(frame);
             else {
                 // Detach the mutable collections before crossing the server-thread boundary.
-                var copy=new MemoryFrame(frame.tick(),frame.dimension(),frame.x(),frame.y(),frame.z(),frame.yaw(),frame.pitch(),frame.health(),frame.caption(),List.copyOf(frame.contacts()),List.copyOf(frame.sounds()),frame.visualSource(),frame.width(),frame.height(),frame.pixels().clone(),frame.png(),frame.body());
+                var copy=new MemoryFrame(frame.tick(),frame.dimension(),frame.x(),frame.y(),frame.z(),frame.yaw(),frame.pitch(),frame.health(),frame.caption(),List.copyOf(frame.contacts()),List.copyOf(frame.sounds()),frame.visualSource(),frame.width(),frame.height(),frame.pixels().clone(),frame.png(),frame.body(),frame.sampleTicks());
                 long weight=512L+copy.pixels().length*4L+copy.png().length()*2L+copy.caption().length()*2L;
                 for(var contact:copy.contacts())weight+=128L+contact.name().length()*2L+contact.appearance().length()*2L;
                 for(var sound:copy.sounds())weight+=64L+sound.id().length()*2L;

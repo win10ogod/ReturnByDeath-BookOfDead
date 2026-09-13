@@ -16,6 +16,7 @@ public final class ClientRecorder {
     private static final java.util.concurrent.atomic.AtomicLong generation=new java.util.concurrent.atomic.AtomicLong();
     private static dev.rbd.io.OrderedIo encoders;
     private static int queueMiB;
+    private static final java.util.concurrent.atomic.AtomicReference<dev.rbd.io.SpoolingImageSender> upload=new java.util.concurrent.atomic.AtomicReference<>();
     private static final ThreadLocal<Boolean> deferredAlpha=ThreadLocal.withInitial(()->false);
     /** Only this thread's memory capture defers the otherwise unchanged screenshot alpha pass. */
     public static boolean defersOpaqueAlpha(){return deferredAlpha.get();}
@@ -24,39 +25,48 @@ public final class ClientRecorder {
         try{return Screenshot.takeScreenshot(target);}
         finally{if(previous)deferredAlpha.set(true);else deferredAlpha.remove();}
     }
-    public static void reset(){generation.incrementAndGet();lastTick=Long.MIN_VALUE;}
+    public static void reset(){generation.incrementAndGet();lastTick=Long.MIN_VALUE;var old=upload.getAndSet(null);if(old!=null)old.close();}
+    public static void acknowledge(dev.rbd.network.ImageAckPayload ack){var sender=upload.get();if(sender!=null)sender.acknowledge(ack.id(),ack.part(),ack.accepted());}
+    public static long pendingUploadBytes(){var sender=upload.get();return sender==null?0:sender.pendingBytes();}
     public static void shutdown(){
-        reset();if(encoders!=null){try{encoders.close();}catch(java.io.IOException error){org.slf4j.LoggerFactory.getLogger("rbd").error("Memory image encoder stopped after an error",error);}finally{encoders=null;}}
+        reset();if(encoders!=null){encoders.closeAsync().whenComplete((done,error)->{if(error!=null)org.slf4j.LoggerFactory.getLogger("rbd").error("Memory image encoder stopped after an error",error);});encoders=null;}
     }
     @SubscribeEvent public static void rendered(RenderFrameEvent.Post e){
         Minecraft mc=Minecraft.getInstance();
         if(mc.level==null||mc.player==null||!mc.options.getCameraType().isFirstPerson()||mc.screen instanceof MemoryScreen)return;
         if(ImmersionOverlay.isSeparated()||ConnectedClientReturn.paused)return;
         if(mc.getOverlay()!=null||mc.screen instanceof net.minecraft.client.gui.screens.ReceivingLevelScreen||mc.screen instanceof net.minecraft.client.gui.screens.ProgressScreen||mc.screen instanceof net.minecraft.client.gui.screens.GenericMessageScreen)return;
-        long tick=mc.level.getGameTime();if(tick==lastTick||Math.floorMod(tick,RbdConfig.VISUAL_INTERVAL.get())!=0)return;lastTick=tick;
+        long tick=mc.level.getGameTime();if(tick==lastTick||!dev.rbd.core.RecordingCadence.due(tick,RbdConfig.captureInterval()))return;lastTick=tick;
         try(NativeImage image=takeImage(mc.getMainRenderTarget())){
             int configured=RbdConfig.CLIENT_WIDTH.get();int width=configured==0?image.getWidth():configured;
             int height=Math.max(1,(int)((long)width*image.getHeight()/image.getWidth()));int[] pixels;
             if(width==image.getWidth())pixels=image.getPixelsRGBA();
             else try(NativeImage scaled=new NativeImage(width,height,false)){image.resizeSubRectTo(0,0,image.getWidth(),image.getHeight(),scaled);pixels=scaled.getPixelsRGBA();}
             int budget=RbdConfig.IMAGE_QUEUE_MIB.get();
-            if(encoders==null||queueMiB!=budget){if(encoders!=null)encoders.close();queueMiB=budget;encoders=new dev.rbd.io.OrderedIo("RBD client images",budget*1048576L);}
+            if(encoders==null){queueMiB=budget;encoders=new dev.rbd.io.OrderedIo("RBD client images",budget*1048576L);}
+            else if(queueMiB!=budget){queueMiB=budget;encoders.budget(budget*1048576L);}
             long epoch=generation.get();var connection=mc.getConnection();
+            var staging=mc.gameDirectory.toPath().resolve(".rbd-upload");
             encoders.submit(512L+pixels.length*4L,()->{
-                if(epoch!=generation.get())return;
+                if(epoch!=generation.get()||connection==null)return;
                 byte[] png=dev.rbd.io.LosslessPng.encodeOpaque(width,height,pixels);
-                String data=Base64.getEncoder().encodeToString(png);String id=UUID.randomUUID().toString();int count=(data.length()+23999)/24000;
-                var packets=new ArrayList<dev.rbd.network.MessagePayload>(count);
-                for(int part=0;part<count;part++){
-                    var msg=RbdNetwork.message("image_chunk");msg.addProperty("id",id);msg.addProperty("part",part);msg.addProperty("count",count);
-                    if(part==0){msg.addProperty("encoding","png");msg.addProperty("width",width);msg.addProperty("height",height);}
-                    msg.addProperty("data",data.substring(part*24000,Math.min(data.length(),(part+1)*24000)));
-                    packets.add(new dev.rbd.network.MessagePayload(msg.toString()));
+                if(epoch!=generation.get())return;
+                var sender=upload.get();
+                if(sender==null){
+                    var created=new dev.rbd.io.SpoolingImageSender(staging,chunk->{
+                        if(epoch!=generation.get()||!connection.getConnection().isConnected())throw new java.io.IOException("Memory upload connection ended");
+                        var msg=RbdNetwork.message("image_chunk");msg.addProperty("id",chunk.id());msg.addProperty("part",chunk.part());msg.addProperty("count",chunk.count());
+                        if(chunk.part()==0){msg.addProperty("encoding","png");msg.addProperty("width",chunk.width());msg.addProperty("height",chunk.height());}
+                        msg.addProperty("data",chunk.data());
+                        connection.getConnection().send(new net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket(new dev.rbd.network.MessagePayload(msg.toString())));
+                    });
+                    if(epoch!=generation.get()){created.close();return;}
+                    if(upload.compareAndSet(null,created)){
+                        if(epoch!=generation.get()){upload.compareAndSet(created,null);created.close();return;}
+                        sender=created;
+                    }else{created.close();sender=upload.get();}
                 }
-                mc.execute(()->{
-                    if(connection==null||mc.getConnection()!=connection||epoch!=generation.get()||ConnectedClientReturn.paused)return;
-                    for(var packet:packets)connection.send(new net.minecraft.network.protocol.common.ServerboundCustomPayloadPacket(packet));
-                });
+                if(epoch==generation.get()&&sender!=null)sender.enqueue(width,height,png);
             });
         }catch(Exception ex){mc.player.displayClientMessage(net.minecraft.network.chat.Component.literal("RBD memory image: "+ex.getMessage()),true);}
     }
