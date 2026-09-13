@@ -12,6 +12,66 @@ import java.util.*;
 @GameTestHolder("rbd")
 @PrefixGameTestTemplate(false)
 public final class RbdGameTests {
+    /** A world read can pump chunk-wait tasks, including entity removal, before returning. */
+    private static final class ReentrantWitness extends net.minecraft.world.entity.npc.Villager {
+        Runnable duringPerception;
+        ReentrantWitness(net.minecraft.server.level.ServerLevel level){super(EntityType.VILLAGER,level);setNoAi(true);setNoGravity(true);}
+        @Override public net.minecraft.world.phys.Vec3 getLookAngle(){
+            Runnable action=duringPerception;duringPerception=null;
+            if(action!=null)action.run();
+            return super.getLookAngle();
+        }
+    }
+    @GameTest(template="empty",batch="memory_lifecycle",timeoutTicks=100)
+    public static void entityLeaveDuringPerceptionKeepsFrameAndContinuation(GameTestHelper helper)throws Exception{
+        var game=GameSession.current;var actor=new ReentrantWitness(helper.getLevel());actor.setPos(helper.absoluteVec(new net.minecraft.world.phys.Vec3(2,1,2)));
+        game.recorder.caption(actor,"before entity leave");
+        actor.duringPerception=()->{try{game.recorder.left(actor);}catch(Exception error){throw new RuntimeException(error);}};
+        game.recorder.record(actor,false);
+        game.recorder.joined(actor);game.recorder.caption(actor,"after entity rejoin");game.recorder.record(actor,false);
+        try(var reader=game.archive.reader(game.recorder.seal(actor.getUUID()))){
+            var first=reader.next();var next=reader.next();
+            helper.assertTrue(first!=null&&first.caption().equals("before entity leave\n"),"in-flight sample survives closing its original segment");
+            helper.assertTrue(next!=null&&next.caption().equals("after entity rejoin\n"),"recording continues with the same memory prefix");
+            helper.assertTrue(reader.next()==null,"no lost or duplicated samples");
+        }game.recorder.left(actor);helper.succeed();
+    }
+    @GameTest(template="empty",batch="memory_lifecycle",timeoutTicks=100)
+    public static void actualRemovalDuringPerceptionSealsCompletedSample(GameTestHelper helper)throws Exception{
+        var game=GameSession.current;var actor=new ReentrantWitness(helper.getLevel());actor.setPos(helper.absoluteVec(new net.minecraft.world.phys.Vec3(2,1,2)));
+        helper.getLevel().addFreshEntity(actor);game.recorder.caption(actor,"last observation before unload");
+        actor.duringPerception=actor::discard;
+        game.recorder.record(actor,false);
+        var head=game.branch.object("heads").get(actor.getUUID().toString()).getAsString();
+        helper.assertTrue(game.recorder.seal(actor.getUUID()).equals(head),"removed actor leaves no unsealed recording track");
+        try(var reader=game.archive.reader(head)){
+            var frame=reader.next();helper.assertTrue(frame!=null&&frame.caption().equals("last observation before unload\n"),"completed perception is preserved across the actual removal event");
+            helper.assertTrue(!frame.body().terminal()&&reader.next()==null,"unloading is not recorded as death");
+        }helper.succeed();
+    }
+    @GameTest(template="empty",batch="memory_lifecycle",timeoutTicks=100)
+    public static void terminalSampleSurvivesEntityLeaveDuringPerception(GameTestHelper helper)throws Exception{
+        var game=GameSession.current;var actor=new ReentrantWitness(helper.getLevel());actor.setPos(helper.absoluteVec(new net.minecraft.world.phys.Vec3(2,1,2)));
+        game.recorder.caption(actor,"terminal after leave");
+        actor.duringPerception=()->{try{game.recorder.left(actor);}catch(Exception error){throw new RuntimeException(error);}};
+        var book=game.recorder.death(actor,helper.getLevel().damageSources().genericKill());
+        try(var reader=game.archive.reader(book.get("head").getAsString())){
+            var ending=reader.next();helper.assertTrue(ending!=null&&ending.body().terminal(),"terminal sample is appended to a writable continuation");
+            helper.assertTrue(ending.caption().equals("terminal after leave\n")&&reader.next()==null,"ending is complete and occurs exactly once");
+        }helper.succeed();
+    }
+    @GameTest(template="empty",batch="memory_lifecycle",timeoutTicks=100)
+    public static void deathDuringPerceptionDoesNotAppendAfterEnding(GameTestHelper helper)throws Exception{
+        var game=GameSession.current;var actor=new ReentrantWitness(helper.getLevel());actor.setPos(helper.absoluteVec(new net.minecraft.world.phys.Vec3(2,1,2)));
+        game.recorder.caption(actor,"last remembered event");
+        actor.duringPerception=()->{try{game.recorder.death(actor,helper.getLevel().damageSources().genericKill());}catch(Exception error){throw new RuntimeException(error);}};
+        game.recorder.record(actor,false);
+        var book=game.archive.books().stream().filter(b->b.get("soul").getAsString().equals(actor.getUUID().toString())).findFirst().orElseThrow();
+        helper.assertTrue(game.recorder.seal(actor.getUUID()).equals(book.get("head").getAsString()),"outer sample cannot reopen a completed life");
+        try(var reader=game.archive.reader(book.get("head").getAsString())){
+            var ending=reader.next();helper.assertTrue(ending!=null&&ending.body().terminal()&&reader.next()==null,"one terminal frame with no post-death continuation");
+        }helper.succeed();
+    }
     @GameTest(template="empty",batch="cadence",timeoutTicks=100)
     public static void experiencedMemorySamplesRelativeToPresentationAndKeepsEnding(GameTestHelper helper)throws Exception{
         var player=new net.neoforged.neoforge.common.util.FakePlayer(helper.getLevel(),new com.mojang.authlib.GameProfile(UUID.randomUUID(),"ReadingCadence"));

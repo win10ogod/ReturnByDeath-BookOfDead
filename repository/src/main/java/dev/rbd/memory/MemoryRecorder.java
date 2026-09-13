@@ -18,6 +18,7 @@ public final class MemoryRecorder implements AutoCloseable {
         String caption="";int[] pixels=new int[0];String png="";int width,height;long imageTick=Long.MIN_VALUE;
         long lastVisualTick=Long.MIN_VALUE;
         long lastExperienceTick=Long.MIN_VALUE;
+        boolean terminal;
         String damageType="";double damage;
         Track(LivingEntity actor){this.actor=actor;}
     }
@@ -48,7 +49,8 @@ public final class MemoryRecorder implements AutoCloseable {
     public void record(LivingEntity e,boolean last) throws IOException {
         // While immersed, the reader sees only the presented memory, not contacts around their body.
         if(game.reading(e.getUUID())&&!last)return;
-        Track t=track(e);int interval=RbdConfig.captureInterval();long tick=e.level().getGameTime();
+        Track t=track(e);if(last)t.terminal=true;
+        int interval=RbdConfig.captureInterval();long tick=e.level().getGameTime();
         List<MemoryFrame.Contact> contacts=Perception.contacts(e);for(var contact:contacts)game.learn(e.getUUID(),contact);
         boolean image=t.segment.count()==0||dev.rbd.core.RecordingCadence.imageDue(tick,t.lastVisualTick,interval)||last;
         int[] pixels=new int[0];int w=0,h=0;String source="CONTINUATION",png="";
@@ -58,10 +60,19 @@ public final class MemoryRecorder implements AutoCloseable {
             else {w=RbdConfig.RASTER_WIDTH.get();h=RbdConfig.RASTER_HEIGHT.get();pixels=Perception.raster(e,w,h);source="SERVER_SUBJECTIVE_RASTER";}
         }
         var body=new SomaticState(e.getMaxHealth(),e.getAirSupply(),e.getMaxAirSupply(),e.isUnderWater(),e.isOnFire(),e.getTicksFrozen(),e.fallDistance,t.damage,t.damageType,last);
-        t.segment.append(new MemoryFrame(e.level().getGameTime(),e.level().dimension().location().toString(),e.getX(),e.getEyeY(),e.getZ(),e.getYRot(),e.getXRot(),e.getHealth(),t.caption,List.copyOf(contacts),List.copyOf(t.sounds),source,w,h,pixels,png,body,RbdConfig.RECORD_INTERVAL.get()));
+        var frame=new MemoryFrame(e.level().getGameTime(),e.level().dimension().location().toString(),e.getX(),e.getEyeY(),e.getZ(),e.getYRot(),e.getXRot(),e.getHealth(),t.caption,List.copyOf(contacts),List.copyOf(t.sounds),source,w,h,pixels,png,body,RbdConfig.RECORD_INTERVAL.get());
+        // World reads can pump chunk-wait tasks. A leave/logout callback may seal t while
+        // perception is still on this stack; a nested death can finish this life entirely.
+        if(game.transitioning||(!last&&(t.terminal||e.isDeadOrDying())))return;
+        // Resolve the writable tail only AFTER every world/entity read. Keep the completed
+        // sample and its caption/body in a child of the sealed prefix, never reopen that file.
+        Track destination=tracks.get(e.getUUID());if(destination==null)destination=track(e);
+        destination.segment.append(frame);
+        if(image)destination.lastVisualTick=tick;
         t.damage=0;
         t.caption="";t.sounds.clear();
-        if(t.segment.count()>=RbdConfig.SEGMENT_FRAMES.get())rotate(e);
+        if(destination.segment.count()>=RbdConfig.SEGMENT_FRAMES.get())rotate(destination.actor);
+        if(e.isRemoved()&&destination.actor==e)seal(e.getUUID());
     }
     public void experienced(ServerPlayer reader,MemoryFrame frame) throws IOException {
         boolean ending=frame.body()!=null&&(frame.body().terminal()||frame.body().rememberedEnding());
