@@ -144,6 +144,7 @@ public final class ConnectedReturn {
             heartbeats.forEach(timer->timer.cancel(false));
             NeoForge.EVENT_BUS.post(new dev.rbd.api.WorldReturnEvent.After(server,game.snapshots.control));
             Runnable action;while((action=afterResume.poll())!=null)action.run();
+            fresh.pruneObsoleteCheckpoints();
         }
     }
     private void reopen(ServerWorldAccess access) throws Exception {

@@ -51,6 +51,9 @@ public final class AutoCheckpointLive {
             if(start==0)start=System.nanoTime();
             if(stage==0){
                 if(g.snapshots.active()==null)return;
+                require(dev.rbd.RbdConfig.AUTO_CHECKPOINT_INTERVAL.get(g.server.getGameRules())==12000,"default automatic interval is 10 minutes at 20 TPS");
+                require(dev.rbd.RbdConfig.CHECKPOINT_RETENTION.get(g.server.getGameRules())==1,"default keeps one committed checkpoint");
+                require(dev.rbd.RbdConfig.FAILED_WORLD_RETENTION.get(g.server.getGameRules())==1,"default keeps one replaced-world recovery backup");
                 rule(g,"rbdMaxHolders","2");if(!g.isHolder(b.getUUID()))g.bind(b);
                 rule(g,"rbdAutoCheckpointIntervalTicks","100");rule(g,"rbdAutoCheckpointSafeTicks","20");rule(g,"rbdAutoCheckpoint","false");
                 g.server.getGameRules().getRule(GameRules.RULE_NATURAL_REGENERATION).set(false,g.server);
@@ -74,6 +77,10 @@ public final class AutoCheckpointLive {
                 before=g;stage=4;a.removeAllEffects();a.invulnerableTime=0;a.hurt(a.damageSources().genericKill(),Float.MAX_VALUE);
                 require(g.returnPending(),"real holder death triggers restore of the automatic checkpoint");
             }else if(stage==4&&g!=before){
+                long snapshots;try(var paths=Files.list(g.snapshots.control.resolve("snapshots"))){snapshots=paths.count();}
+                if(snapshots!=1){if(++ticks>600)throw new AssertionError("background checkpoint retirement did not finish");return;}
+                require(snapshots==1,"older complete checkpoint removed by background retention");
+                try(var paths=Files.list(g.snapshots.control.resolve("failed"))){require(paths.count()==1,"one replaced-world recovery backup retained");}
                 require(checkpoint.equals(g.snapshots.active().get("id").getAsString()),"death restores the latest automatic checkpoint without creating another");
                 require(a.serverLevel().getBlockState(marker).is(Blocks.DIAMOND_BLOCK),"world block restored from automatic checkpoint");
                 for(ServerPlayer p:List.of(a,b)){
@@ -84,7 +91,7 @@ public final class AutoCheckpointLive {
                 boolean clientImage=false,terminal=false;long frames=0;
                 try(var reader=g.archive.reader(book.get("head").getAsString())){dev.rbd.memory.MemoryFrame f;while((f=reader.next())!=null){frames++;clientImage|=!f.png().isEmpty();terminal|=f.body()!=null&&f.body().terminal();}}
                 require(clientImage&&terminal,"async first-person images and terminal memory survived save and return");
-                JsonObject result=new JsonObject();result.addProperty("result","PASS");result.addProperty("version","0.7.0");result.add("checks",checks);result.add("pauseMillis",pauses);result.addProperty("recordedFrames",frames);result.addProperty("testIntervalTicks",100);result.addProperty("defaultIntervalTicks",12000);result.addProperty("elapsedSeconds",(System.nanoTime()-start)/1e9);result.add("loginCounts",new Gson().toJsonTree(logins));
+                JsonObject result=new JsonObject();result.addProperty("result","PASS");result.addProperty("version",net.neoforged.fml.ModList.get().getModContainerById("rbd").orElseThrow().getModInfo().getVersion().toString());result.add("checks",checks);result.add("pauseMillis",pauses);result.addProperty("recordedFrames",frames);result.addProperty("testIntervalTicks",100);result.addProperty("defaultIntervalTicks",12000);result.addProperty("elapsedSeconds",(System.nanoTime()-start)/1e9);result.add("loginCounts",new Gson().toJsonTree(logins));
                 var sorted=steadyTicks.stream().mapToLong(Long::longValue).sorted().toArray();
                 if(sorted.length>0){result.addProperty("steadyTicks",sorted.length);result.addProperty("steadyMeanMs",Arrays.stream(sorted).average().orElseThrow()/1e6);result.addProperty("steadyP95Ms",sorted[(int)((sorted.length-1)*0.95)]/1e6);result.addProperty("steadyMaxMs",sorted[sorted.length-1]/1e6);}
                 AtomicJson.write(report(),result);done=true;

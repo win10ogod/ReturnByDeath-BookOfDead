@@ -51,6 +51,8 @@ public final class RbdConfig {
     public static final Setting<Integer> MEMORY_QUEUE_MIB=WorldRules.integer("rbdMemoryWriteQueueMiB",()->64,1,4096);
     public static final Setting<Integer> IMAGE_QUEUE_MIB=WorldRules.integer("rbdClientImageQueueMiB",()->64,1,4096);
     public static final Setting<Boolean> REUSE_SNAPSHOT_FILES=WorldRules.bool("rbdReuseSnapshotFiles",()->true);
+    public static final Setting<Integer> CHECKPOINT_RETENTION=WorldRules.integer("rbdCheckpointRetention",()->1,1,2147483647);
+    public static final Setting<Integer> FAILED_WORLD_RETENTION=WorldRules.integer("rbdFailedWorldRetention",()->1,0,2147483647);
     public static final Setting<Double> RETURN_DWELL=WorldRules.decimal("rbdReturnEndingSeconds",()->4.0,0,86400);
     public static final Setting<Double> ECHO_SECONDS=WorldRules.decimal("rbdReturnEchoSeconds",()->5.0,0,86400);
     public static final Setting<Double> ECHO_COOLDOWN=WorldRules.decimal("rbdDeathSiteRecallDelaySeconds",()->10.0,0,86400);

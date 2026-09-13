@@ -40,7 +40,7 @@ public final class RbdEvents {
     }
     @SubscribeEvent public void started(ServerStartedEvent e){
         normalStopping=false;ArchiveLibrary.clear();
-        try{GameSession.current=new GameSession(e.getServer());ArchiveLibrary.generate(GameSession.current);}
+        try{GameSession.current=new GameSession(e.getServer());ArchiveLibrary.generate(GameSession.current);GameSession.current.pruneObsoleteCheckpoints();}
         catch(Exception ex){LOG.error("RBD world initialization failed",ex);GameSession.current=null;e.getServer().halt(false);}
     }
     @SubscribeEvent public void login(PlayerEvent.PlayerLoggedInEvent e){

@@ -61,6 +61,12 @@ public final class GameSession implements AutoCloseable {
         saveGuard.attach();
     }
     public boolean isHolder(UUID id){return authorities.contains(id);}
+    public void pruneObsoleteCheckpoints(){
+        var rules=server.getWorldData().getGameRules();
+        SnapshotRetention.schedule(snapshots.control,snapshots.world.getFileName().toString(),supervisor!=null,
+            RbdConfig.CHECKPOINT_RETENTION.get(rules),RbdConfig.FAILED_WORLD_RETENTION.get(rules),
+            error->org.slf4j.LoggerFactory.getLogger("rbd").warn("Obsolete checkpoint cleanup deferred; current checkpoint and memories retained",error));
+    }
     public JsonObject soul(UUID id){JsonObject person=authorities.person(id);if(person==null)throw new IllegalArgumentException("Unknown authority holder: "+id);return person;}
     public List<UUID> holders(){return authorities.activeIds();}
     public boolean returnPending(){return !pendingDeaths.isEmpty();}

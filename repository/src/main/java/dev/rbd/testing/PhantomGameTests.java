@@ -43,13 +43,20 @@ public final class PhantomGameTests {
     @GameTest(template="empty",batch="phantom",timeoutTicks=120)
     public static void phantomAuraUsesSphereAndExemptsOnlyItsTarget(GameTestHelper h){
         var target=new net.neoforged.neoforge.common.util.FakePlayer(h.getLevel(),new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(),"PhantomTest"));var boss=h.spawnWithNoFreeWill(ModContent.PHANTOM.get(),2,1,2);boss.mirror(target);target.setPos(boss.position());
+        // This radius extends outside the tiny template. Load its destination chunks before
+        // moving fixtures, and allow the entity manager to publish their section visibility.
+        h.getLevel().getChunk(net.minecraft.core.BlockPos.containing(boss.getX()+32.1,boss.getY(),boss.getZ()));
+        h.getLevel().getChunk(net.minecraft.core.BlockPos.containing(boss.getX()+24,boss.getY(),boss.getZ()+24));
         var inside=h.spawnWithNoFreeWill(EntityType.PIG,3,1,2);inside.setPos(boss.getX()+31.9,boss.getY(),boss.getZ());
         var outside=h.spawnWithNoFreeWill(EntityType.PIG,4,1,2);outside.setPos(boss.getX()+32.1,boss.getY(),boss.getZ());
         var diagonal=h.spawnWithNoFreeWill(EntityType.COW,5,1,2);diagonal.setPos(boss.getX()+24,boss.getY(),boss.getZ()+24);
+        h.runAfterDelay(2,()->{
+        h.assertTrue(com.google.common.collect.Lists.newArrayList(h.getLevel().getAllEntities()).contains(inside),"radius fixture is present in the loaded entity index");
         boss.enterSecondPhase();var tag=new CompoundTag();boss.saveWithoutId(tag);tag.putInt("AuraDelay",0);boss.load(tag);
         boss.pulseAura();h.assertTrue(inside.isRemoved(),"within default 32 blocks is killed");
         h.assertTrue(outside.isAlive()&&diagonal.isAlive(),"outside radius and box-only diagonal excluded");h.assertTrue(target.isAlive()&&boss.isAlive(),"locked target and executing phantom exempt");
         outside.discard();diagonal.discard();boss.discard();h.succeed();
+        });
     }
     @GameTest(template="empty",batch="phantom",timeoutTicks=100)
     public static void phantomLearningAndRulesPersist(GameTestHelper h){

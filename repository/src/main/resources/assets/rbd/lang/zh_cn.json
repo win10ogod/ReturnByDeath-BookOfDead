@@ -220,5 +220,9 @@
   "gamerule.rbdClientImageQueueMiB": "客戶端影像壓縮緩衝（MiB）",
   "gamerule.rbdClientImageQueueMiB.description": "預設 64 MiB。擷取後於背景壓縮 PNG，不改變解析度與錄製頻率；緩衝滿時等待。",
   "gamerule.rbdReuseSnapshotFiles": "重用未變動的快照檔案",
-  "gamerule.rbdReuseSnapshotFiles.description": "完整校驗後讓不可變備份共用未改變的檔案，減少寫入量。遊戲存檔與還原世界仍使用獨立檔案。不支援時自動複製；下次開啟世界生效。"
+  "gamerule.rbdReuseSnapshotFiles.description": "完整校驗後讓不可變備份共用未改變的檔案，減少寫入量。遊戲存檔與還原世界仍使用獨立檔案。不支援時自動複製；下次開啟世界生效。",
+  "gamerule.rbdCheckpointRetention": "保留的完整回歸存檔數",
+  "gamerule.rbdCheckpointRetention.description": "預設 1 份。新回歸點校驗、世界重新載入成功後，在背景淘汰舊完整存檔；死者之書與記憶保留。下次存檔、回歸或開啟世界時清理。",
+  "gamerule.rbdFailedWorldRetention": "保留的回歸前世界備份數",
+  "gamerule.rbdFailedWorldRetention.description": "預設保留最近 1 份被替換的世界供復原；0 表示成功重新載入後不保留。未完成交易與故障現場不會自動刪除。"
 }

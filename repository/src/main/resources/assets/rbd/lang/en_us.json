@@ -248,5 +248,9 @@
   "gamerule.rbdClientImageQueueMiB": "Client image compression buffer (MiB)",
   "gamerule.rbdClientImageQueueMiB.description": "Default 64 MiB. Encodes captured PNG images in the background at the configured resolution and frequency. A full buffer applies backpressure.",
   "gamerule.rbdReuseSnapshotFiles": "Reuse unchanged snapshot files",
-  "gamerule.rbdReuseSnapshotFiles.description": "Reuses unchanged files between immutable snapshots with full checksum verification. Live and restored worlds always have independent files. Falls back to copying when unsupported; applies on the next world open."
+  "gamerule.rbdReuseSnapshotFiles.description": "Reuses unchanged files between immutable snapshots with full checksum verification. Live and restored worlds always have independent files. Falls back to copying when unsupported; applies on the next world open.",
+  "gamerule.rbdCheckpointRetention": "Retained world checkpoints",
+  "gamerule.rbdCheckpointRetention.description": "Default 1: retire older committed copies in the background after the new checkpoint is verified and the world reopens. Books and memories are preserved. Applies after the next save/return or world open.",
+  "gamerule.rbdFailedWorldRetention": "Retained replaced-world backups",
+  "gamerule.rbdFailedWorldRetention.description": "Default 1: keep the most recent replaced world for recovery; 0 removes completed backups after a successful reopen. Incomplete transactions and fault evidence are preserved."
 }

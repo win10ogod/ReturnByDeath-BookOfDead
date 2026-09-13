@@ -21,6 +21,7 @@
     "PhantomCuriosMixin"
   ],
   "client": [
+    "MemoryScreenshotMixin",
     "WorldOpenMixin",
     "ImmersionRenderMixin",
     "StatsAccess",

@@ -16,6 +16,11 @@ public final class PngSelfTest {
                 int p=pixels[y*w+x],argb=(p&0xff00ff00)|((p&255)<<16)|((p>>>16)&255);
                 if(decoded.getRGB(x,y)!=argb)throw new AssertionError("PNG pixel/alpha changed at "+x+","+y);checked++;
             }
+            int[] before=pixels.clone(),reference=pixels.clone();
+            for(int i=0;i<reference.length;i++)reference[i]|=0xff000000;
+            byte[] opaque=LosslessPng.encodeOpaque(w,h,pixels);
+            if(!Arrays.equals(opaque,LosslessPng.encode(w,h,reference)))throw new AssertionError("Opaque screenshot PNG differs from the existing encoder");
+            if(!Arrays.equals(before,pixels))throw new AssertionError("Opaque encoding mutated the captured pixels");
         }
         System.out.println("PngSelfTest: "+checked+" exact RGBA pixels passed, including native 1080p");
     }

@@ -16,6 +16,14 @@ public final class ClientRecorder {
     private static final java.util.concurrent.atomic.AtomicLong generation=new java.util.concurrent.atomic.AtomicLong();
     private static dev.rbd.io.OrderedIo encoders;
     private static int queueMiB;
+    private static final ThreadLocal<Boolean> deferredAlpha=ThreadLocal.withInitial(()->false);
+    /** Only this thread's memory capture defers the otherwise unchanged screenshot alpha pass. */
+    public static boolean defersOpaqueAlpha(){return deferredAlpha.get();}
+    private static NativeImage takeImage(com.mojang.blaze3d.pipeline.RenderTarget target){
+        boolean previous=deferredAlpha.get();deferredAlpha.set(true);
+        try{return Screenshot.takeScreenshot(target);}
+        finally{if(previous)deferredAlpha.set(true);else deferredAlpha.remove();}
+    }
     public static void reset(){generation.incrementAndGet();lastTick=Long.MIN_VALUE;}
     public static void shutdown(){
         reset();if(encoders!=null){try{encoders.close();}catch(java.io.IOException error){org.slf4j.LoggerFactory.getLogger("rbd").error("Memory image encoder stopped after an error",error);}finally{encoders=null;}}
@@ -26,7 +34,7 @@ public final class ClientRecorder {
         if(ImmersionOverlay.isSeparated()||ConnectedClientReturn.paused)return;
         if(mc.getOverlay()!=null||mc.screen instanceof net.minecraft.client.gui.screens.ReceivingLevelScreen||mc.screen instanceof net.minecraft.client.gui.screens.ProgressScreen||mc.screen instanceof net.minecraft.client.gui.screens.GenericMessageScreen)return;
         long tick=mc.level.getGameTime();if(tick==lastTick||Math.floorMod(tick,RbdConfig.VISUAL_INTERVAL.get())!=0)return;lastTick=tick;
-        try(NativeImage image=Screenshot.takeScreenshot(mc.getMainRenderTarget())){
+        try(NativeImage image=takeImage(mc.getMainRenderTarget())){
             int configured=RbdConfig.CLIENT_WIDTH.get();int width=configured==0?image.getWidth():configured;
             int height=Math.max(1,(int)((long)width*image.getHeight()/image.getWidth()));int[] pixels;
             if(width==image.getWidth())pixels=image.getPixelsRGBA();
@@ -36,7 +44,7 @@ public final class ClientRecorder {
             long epoch=generation.get();var connection=mc.getConnection();
             encoders.submit(512L+pixels.length*4L,()->{
                 if(epoch!=generation.get())return;
-                byte[] png=dev.rbd.io.LosslessPng.encode(width,height,pixels);
+                byte[] png=dev.rbd.io.LosslessPng.encodeOpaque(width,height,pixels);
                 String data=Base64.getEncoder().encodeToString(png);String id=UUID.randomUUID().toString();int count=(data.length()+23999)/24000;
                 var packets=new ArrayList<dev.rbd.network.MessagePayload>(count);
                 for(int part=0;part<count;part++){
