@@ -18,7 +18,9 @@ public final class OrderedIo implements AutoCloseable {
         this.budget=budget;
         worker=Executors.newSingleThreadExecutor(r->{Thread t=new Thread(r,name);t.setDaemon(true);return t;});
     }
-    public synchronized void check() throws IOException {if(failure!=null)throw failure;}
+    // Each observer gets a distinct exception so try-with-resources can attach a close failure
+    // without replacing the original I/O/OOM cause with "Self-suppression not permitted".
+    public synchronized void check() throws IOException {if(failure!=null)throw new IOException(failure.getMessage(),failure);}
     public synchronized long pendingBytes(){return pending;}
     public synchronized void budget(long bytes){if(bytes<1)throw new IllegalArgumentException("Positive queue budget required");budget=bytes;notifyAll();}
     public synchronized CompletableFuture<Void> submit(long bytes,Work work) throws IOException {

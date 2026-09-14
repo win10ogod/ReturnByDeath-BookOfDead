@@ -55,7 +55,9 @@ public final class MemoryArchive implements AutoCloseable {
             }
             count++;
         }
-        private void write(MemoryFrame frame) throws IOException {writer.write(GSON.toJson(frame));writer.newLine();}
+        // Stream directly to the compressor. A complete JSON String duplicates the large PNG
+        // and its expanding StringWriter buffer outside the configured queue's byte budget.
+        private void write(MemoryFrame frame) throws IOException {GSON.toJson(frame,writer);writer.newLine();}
         public long count(){return count;}
         public void close() throws IOException {
             closeAsync();
@@ -68,7 +70,7 @@ public final class MemoryArchive implements AutoCloseable {
             closed=true;
         }
         private void seal() throws IOException {
-            writer.close();
+            writer.close();writer=null;
             try(FileChannel f=FileChannel.open(path,StandardOpenOption.WRITE)){f.force(true);}
             JsonObject meta=new JsonObject();meta.addProperty("id",id);meta.addProperty("parent",parent);meta.addProperty("frames",count);meta.addProperty("sha256",SnapshotStore.hash(path));
             AtomicJson.write(root.resolve("segments").resolve(id+".json"),meta);
@@ -92,7 +94,7 @@ public final class MemoryArchive implements AutoCloseable {
     public final class ReaderFrames implements AutoCloseable {
         private record SegmentRef(Path path,String checksum){}
         private final Deque<SegmentRef> segments=new ArrayDeque<>();
-        private BufferedReader reader;
+        private com.google.gson.stream.JsonReader reader;
         ReaderFrames(String head) throws IOException {
             if(!head.isEmpty()&&!Files.isRegularFile(root.resolve("segments").resolve(UUID.fromString(head)+".json")))flush();
             Set<String> visited=new HashSet<>();
@@ -105,11 +107,22 @@ public final class MemoryArchive implements AutoCloseable {
         }
         public MemoryFrame next() throws IOException {
             for(;;){
-                if(reader==null){if(segments.isEmpty())return null;var segment=segments.removeFirst();if(!SnapshotStore.hash(segment.path()).equals(segment.checksum()))throw new IOException("Memory checksum mismatch");reader=new BufferedReader(new InputStreamReader(new GZIPInputStream(new BufferedInputStream(Files.newInputStream(segment.path()),65536),65536),java.nio.charset.StandardCharsets.UTF_8),65536);}
-                String line=reader.readLine();if(line!=null)return GSON.fromJson(line,MemoryFrame.class);
+                if(reader==null){
+                    if(segments.isEmpty())return null;var segment=segments.removeFirst();
+                    if(!SnapshotStore.hash(segment.path()).equals(segment.checksum()))throw new IOException("Memory checksum mismatch");
+                    var input=new BufferedReader(new InputStreamReader(new GZIPInputStream(new BufferedInputStream(Files.newInputStream(segment.path()),65536),65536),java.nio.charset.StandardCharsets.UTF_8),65536);
+                    // Reentrant unloads can seal a valid, empty prefix. JsonReader.peek() throws
+                    // at the start of an empty document, so check EOF before creating the parser.
+                    try{input.mark(1);if(input.read()==-1){input.close();continue;}input.reset();}
+                    catch(IOException error){input.close();throw error;}
+                    reader=new com.google.gson.stream.JsonReader(input);
+                    // Existing segments contain consecutive JSON values separated by newlines.
+                    reader.setLenient(true);
+                }
+                if(reader.peek()!=com.google.gson.stream.JsonToken.END_DOCUMENT)return GSON.fromJson(reader,MemoryFrame.class);
                 reader.close();reader=null;
             }
         }
-        public void close() throws IOException {if(reader!=null)reader.close();segments.clear();}
+        public void close() throws IOException {if(reader!=null){reader.close();reader=null;}segments.clear();}
     }
 }
