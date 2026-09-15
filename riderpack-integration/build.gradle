@@ -1,0 +1,57 @@
+plugins {
+ id 'java-library'
+ id 'net.neoforged.gradle.userdev' version '7.1.38'
+}
+version = '1.1.4'
+group = 'dev.riderpack'
+base { archivesName = 'riderpack-integration' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+runs {
+ configureEach {
+  workingDirectory project.layout.buildDirectory.dir('run').get().dir(name)
+  systemProperty 'forge.logging.console.level', 'info'
+  modSource project.sourceSets.main
+ }
+ client {}
+ server { argument '--nogui' }
+}
+dependencies {
+ implementation 'net.neoforged:neoforge:21.1.248'
+ implementation fileTree('build/dependencies') { include '*.jar' }
+}
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.register('compileCombatSelfTest', JavaCompile) {
+    source = fileTree('tests') { include '*.java' }
+    classpath = sourceSets.main.runtimeClasspath
+    destinationDirectory = layout.buildDirectory.dir('combat-self-test')
+    javaCompiler = javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(21) }
+    options.release = 21
+}
+tasks.register('combatSelfTest', JavaExec) {
+    dependsOn 'compileCombatSelfTest'
+    classpath = files(layout.buildDirectory.dir('combat-self-test')) + sourceSets.main.runtimeClasspath
+    mainClass = 'dev.riderpack.MightyCombatReturnSelfTest'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+}
+tasks.named('check') { dependsOn 'combatSelfTest' }
+tasks.register('exportCompatLaunches') {
+    dependsOn {
+        ['runClient', 'runServer'].collectMany { name ->
+            def run = tasks.named(name).get()
+            run.taskDependencies.getDependencies(run).toList()
+        }
+    }
+    doLast {
+        def target = layout.buildDirectory.dir('compat-launch').get().asFile
+        target.mkdirs()
+        ['client', 'server'].each { side ->
+            def run = tasks.named('run'+side.capitalize()).get()
+            def spec = [java:run.javaLauncher.get().executablePath.asFile.absolutePath,
+                        jvm:run.allJvmArgs, args:run.args, main:run.mainClass.get(),
+                        classpath:run.classpath.asPath,
+                        environment:run.environment.findAll { k,v -> k in ['MOD_CLASSES', 'MOD_FOLDERS'] }]
+            new File(target, side+'.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(spec))
+        }
+        println 'Compatibility launch specifications: '+target
+    }
+}

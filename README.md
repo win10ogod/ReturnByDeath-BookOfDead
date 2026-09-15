@@ -6,6 +6,14 @@ Minecraft **1.21.1** · NeoForge **21.1.235** · Java **21**
 
 死亡後回到共同回歸點，保留跨輪迴記憶。死者之書記錄生前經歷，讀者按順序追體驗，直至死亡的失聲與黑暗。
 
+## 整合包 1.3.10：相容模組 1.1.4 記憶體修補
+
+[下載相容模組更新](https://github.com/win10ogod/ReturnByDeath-BookOfDead/releases/tag/riderpack-v1.1.4)。正常退出遊戲後，以 `riderpack-integration-1.1.4.jar` 替換原整合包中的舊版相容模組，房主、朋友與專服同步更新。死歸本體仍使用 **0.7.6**；此附件供已有騎士輪迴生存整合包的玩家使用。
+
+修正 Accelerated Rendering 1.0.14 與 ImmediatelyFast 1.6.11 同時使用時，相同物品模型每幀新增快取、掛機持續占用記憶體的問題。原本的繪製效果、記憶畫質、歷史及保存間隔保留。修正版基地掛機 30 分鐘未再出現此累積，25 種物品的畫面逐像素一致，雙客戶端完成 12 次回歸並保持原連線。尚未完成 Windows／Radmin 整晚驗證，未宣稱排除全部 OOM 原因；完整條件與其餘引用的觀察見 [版本說明](riderpack-integration/release-notes.txt)。
+
+相容模組原始碼位於 `riderpack-integration/`。使用 Java 21、Python 3.11 以上，在儲存庫根目錄執行 `python tools/riderpack_dependencies.py` 下載並核對固定版本的建構依賴，再執行 `cd riderpack-integration` 和 `bash gradlew --no-daemon build`（Windows 使用 `gradlew.bat`）。JAR 位於該目錄的 `build/libs/`。`riderpack-v*` 標籤自動建構、自測與發布相容模組；原有 `v*` 標籤繼續發布死歸本體。第三方依賴僅下載至建構目錄，不隨附件分發。
+
 ## 0.7.6：減少記憶封存與讀取的暫存記憶體
 
 記憶影像直接串流序列化至壓縮檔，讀取時也改用串流解析，減少完整 JSON 字串與整行文字的重複配置。片段封存後解除寫入器引用；背景 I/O 失敗時保留原始原因，避免清理例外掩蓋它。

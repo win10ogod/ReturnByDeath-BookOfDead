@@ -1,0 +1,4 @@
+{
+  "gamerule.rbdArchiveCompressionLevel": "記憶檔外層壓縮等級",
+  "gamerule.rbdArchiveCompressionLevel.description": "0–9。預設 0：記憶 PNG 已無損壓縮，略過外層重複壓縮以減少伺服器停頓；檔案較大。6 恢復原本壓縮。所有等級均保留完整畫質、頻率與內容；下一個記憶片段起生效。"
+}

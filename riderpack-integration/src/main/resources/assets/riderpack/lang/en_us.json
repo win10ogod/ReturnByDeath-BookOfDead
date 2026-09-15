@@ -1,0 +1,4 @@
+{
+  "gamerule.rbdArchiveCompressionLevel": "Memory archive outer compression level",
+  "gamerule.rbdArchiveCompressionLevel.description": "0–9. Default 0 skips redundant outer compression of lossless PNG images, reducing server stalls at the cost of larger archives. 6 restores the original compression. Every level preserves all pixels, frames and content. Applies to new segments."
+}

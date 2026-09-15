@@ -1,0 +1,62 @@
+[
+  {
+    "file": "generic_henshin-cf8875273.jar",
+    "url": "https://www.cursemaven.com/curse/maven/generic-henshin-1668781/8875273/generic-henshin-1668781-8875273.jar",
+    "sha256": "faaac680184f89c71eb514b257f1238129897ab425d35096db52313abe44fa3a"
+  },
+  {
+    "file": "kamenridercraft-1.1.4.jar",
+    "url": "https://mediafilez.forgecdn.net/files/8869/63/kamenridercraft-1.1.4.jar",
+    "sha256": "0ecbdaa341592efc105529a537280965baa21bc2c4c08c5b20d744d915fd3690"
+  },
+  {
+    "file": "krc-rider-power-1.2.0+krc.4ZX8Z7XD.jar",
+    "url": "https://github.com/win10ogod/krc-rider-power/releases/download/compat-v1.2.0-krc-4ZX8Z7XD/krc-rider-power-1.2.0%2Bkrc.4ZX8Z7XD.jar",
+    "sha256": "083fb8fbbe8f27df12086b03291709e8a8374eaef3c8e40a385d79e5f5963b92"
+  },
+  {
+    "file": "rbd-0.7.6.jar",
+    "url": "https://github.com/win10ogod/ReturnByDeath-BookOfDead/releases/download/v0.7.6/rbd-0.7.6.jar",
+    "sha256": "cbeab4b7a8b1c8a8102677763a1bb031f9cecd998ccd43762f558f9b70cb91a8"
+  },
+  {
+    "file": "acceleratedrendering-1.0.14-1.21.1-alpha.jar",
+    "url": "https://mediafilez.forgecdn.net/files/8448/200/acceleratedrendering-1.0.14-1.21.1-alpha.jar",
+    "sha256": "f567f7a88c241e5e4266ee1804bd89e31f4fd6faf31745ed14f4a0a0a0e199cc"
+  },
+  {
+    "file": "ImmediatelyFast-NeoForge-1.6.11+1.21.1.jar",
+    "url": "https://cdn.modrinth.com/data/5ZwdcRci/versions/zxT50PTW/ImmediatelyFast-NeoForge-1.6.11%2B1.21.1.jar",
+    "sha256": "336df12f099d1a441a3e06850bea86e9c2d0c8bc022d3d9a201870a201562a04"
+  },
+  {
+    "file": "architectury-13.0.11-neoforge.jar",
+    "url": "https://cdn.modrinth.com/data/lhGA9TYQ/versions/1IiqEQGl/architectury-13.0.11-neoforge.jar",
+    "sha256": "9cc92f2c09533fc5482c60f993bd891c655a0e32b637037cdcb7c2b23adedeeb"
+  },
+  {
+    "file": "ftb-library-neoforge-2101.1.35.jar",
+    "url": "https://mediafilez.forgecdn.net/files/8569/579/ftb-library-neoforge-2101.1.35.jar",
+    "sha256": "be7b2bd0b5370a9951624a1d84fd802efecae88d5a0cd24552731f887430599d"
+  },
+  {
+    "file": "ftb-quests-neoforge-2101.1.35.jar",
+    "url": "https://mediafilez.forgecdn.net/files/8842/729/ftb-quests-neoforge-2101.1.35.jar",
+    "sha256": "e14d43857bbe7060dda3755e0fad9a13dc87013f39feeb4a90777d78491e10eb"
+  },
+  {
+    "file": "ftb-teams-neoforge-2101.1.11.jar",
+    "url": "https://mediafilez.forgecdn.net/files/8724/782/ftb-teams-neoforge-2101.1.11.jar",
+    "sha256": "e6bcd670493624e6906df872a9c6af4a33fe6405cac57a32c59cd4cd5838c655"
+  },
+  {
+    "file": "timeclock-4.7.0-neoforge-1.21.1.jar",
+    "url": "https://cdn.modrinth.com/data/KZOjyOXV/versions/YPUMGIbu/timeclock-4.7.0-neoforge-1.21.1.jar",
+    "sha256": "87c0394640046b591e14abc78ca94a973d7e5a2ca09eb88f4de999d44eeb63bb"
+  },
+  {
+    "file": "xaeroworldmap-neoforge-1.21.1-1.46.0.jar",
+    "url": "https://cdn.modrinth.com/data/NcUtCpym/versions/9Ckiihkz/xaeroworldmap-neoforge-1.21.1-1.46.0.jar",
+    "sha256": "a7f059e4c48211f6d5c962e7640f5179cc1636bccc907ea77ab9e1865635cb24"
+  }
+]

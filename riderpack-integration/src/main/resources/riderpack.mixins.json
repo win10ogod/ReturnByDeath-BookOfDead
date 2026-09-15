@@ -1,0 +1,10 @@
+{
+ "required": true,
+ "minVersion": "0.8",
+ "package": "dev.riderpack.mixin",
+ "plugin": "dev.riderpack.mixin.CompatibilityPlugin",
+ "compatibilityLevel": "JAVA_21",
+ "mixins": ["MightyCombatSideMixin", "MemoryArchiveCompressionMixin"],
+ "client": ["XaeroWorldReadMixin", "XaeroMapLifecycleMixin", "ImmediatelyFastMeshLayerMixin", "AcceleratedMeshIdentityMixin"],
+ "injectors": {"defaultRequire": 1}
+}

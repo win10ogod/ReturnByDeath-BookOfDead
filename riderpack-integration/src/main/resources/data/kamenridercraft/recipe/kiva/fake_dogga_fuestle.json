@@ -1,0 +1,14 @@
+{
+  "type": "kamenridercraft:ixa_machine_block",
+  "result": {
+    "id": "kamenridercraft:fakedoggafuestle"
+  },
+  "ingredients": [
+    {
+      "item": "kamenridercraft:fuestlefake"
+    },
+    {
+      "item": "kamenridercraft:doggafuestle"
+    }
+  ]
+}
