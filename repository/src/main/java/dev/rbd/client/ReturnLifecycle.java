@@ -8,6 +8,7 @@ public final class ReturnLifecycle {
     private static volatile String readyWorld,error;
     private static boolean waiting;
     public static void begin(com.google.gson.JsonObject message){
+        if(message.get("operation").getAsString().equals("CAPTURE"))CheckpointNotice.saving();else CheckpointNotice.clear();
         if(message.has("connected")&&message.get("connected").getAsBoolean()){
             ConnectedClientReturn.begin();
             if(message.has("ending"))ImmersionOverlay.departing(dev.rbd.memory.MemoryArchive.GSON.fromJson(message.get("ending"),dev.rbd.memory.SomaticState.class),true);

@@ -226,5 +226,8 @@
   "gamerule.rbdFailedWorldRetention": "保留的回歸前世界備份數",
   "gamerule.rbdFailedWorldRetention.description": "預設保留最近 1 份被替換的世界供復原；0 表示成功重新載入後不保留。未完成交易與故障現場不會自動刪除。",
   "gamerule.rbdMemoryRecordIntervalTicks": "RBD · 記憶掃描與保存間隔（刻）",
-  "gamerule.rbdMemoryRecordIntervalTicks.description": "預設 100 刻（正常速度每 5 秒）。角色狀態、感知掃描與影像按間隔記錄；死亡時另記最後狀態。範圍：1 ～ 2147483647。"
+  "gamerule.rbdMemoryRecordIntervalTicks.description": "預設 100 刻（正常速度每 5 秒）。角色狀態、感知掃描與影像按間隔記錄；死亡時另記最後狀態。範圍：1 ～ 2147483647。",
+  "message.rbd.checkpoint_saving": "正在存档…",
+  "message.rbd.checkpoint_saved": "回归点已更新",
+  "message.rbd.checkpoint_failed": "存档未完成"
 }

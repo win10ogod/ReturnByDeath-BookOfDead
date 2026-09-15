@@ -254,5 +254,8 @@
   "gamerule.rbdFailedWorldRetention": "Retained replaced-world backups",
   "gamerule.rbdFailedWorldRetention.description": "Default 1: keep the most recent replaced world for recovery; 0 removes completed backups after a successful reopen. Incomplete transactions and fault evidence are preserved.",
   "gamerule.rbdMemoryRecordIntervalTicks": "RBD · Memory scan and recording interval (ticks)",
-  "gamerule.rbdMemoryRecordIntervalTicks.description": "Default: 100 (5 seconds at 20 TPS). Samples state, perception and images only at the configured interval; death still records the terminal state. Range: 1 to 2147483647."
+  "gamerule.rbdMemoryRecordIntervalTicks.description": "Default: 100 (5 seconds at 20 TPS). Samples state, perception and images only at the configured interval; death still records the terminal state. Range: 1 to 2147483647.",
+  "message.rbd.checkpoint_saving": "Saving checkpoint…",
+  "message.rbd.checkpoint_saved": "Checkpoint updated",
+  "message.rbd.checkpoint_failed": "Checkpoint save failed"
 }

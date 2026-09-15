@@ -134,6 +134,10 @@ public final class GameSession implements AutoCloseable {
     public void transition(String operation,JsonObject death) throws IOException {
         if(transitioning)throw new IOException("Return already in progress");
         saveGuard.check();
+        if(operation.equals("CAPTURE")){
+            var notice=RbdNetwork.message("checkpoint_saving");
+            for(ServerPlayer player:server.getPlayerList().getPlayers())RbdNetwork.send(player,notice);
+        }
         closeImageReceivers();
         recorder.close();
         archive.close();
