@@ -107,7 +107,12 @@ public final class GameSession implements AutoCloseable {
         if(isHolder(who)){JsonObject soul=soul(who);if(!soul.has("knowledge"))soul.add("knowledge",new JsonObject());return soul.getAsJsonObject("knowledge");}
         JsonObject all=branch.object("knowledge");if(!all.has(who.toString()))all.add(who.toString(),new JsonObject());return all.getAsJsonObject(who.toString());
     }
-    public void learn(UUID who,MemoryFrame.Contact contact){if(!contact.name().isBlank())knowledge(who).add(contact.soul().toString(),MemoryArchive.GSON.toJsonTree(contact));}
+    public void learn(UUID who,MemoryFrame.Contact contact){introduce(who,contact);}
+    public boolean introduce(UUID who,MemoryFrame.Contact contact){
+        if(contact.name().isBlank())return false;
+        var known=knowledge(who);String id=contact.soul().toString();boolean introduced=!known.has(id);
+        known.add(id,MemoryArchive.GSON.toJsonTree(contact));return introduced;
+    }
     public void learnExperience(UUID who,MemoryFrame.Contact contact,String book,long sequence){
         if(contact.name().isBlank())return;
         var evidence=MemoryArchive.GSON.toJsonTree(contact).getAsJsonObject();evidence.addProperty("source","EXPERIENCED_MEMORY");evidence.addProperty("book",book);evidence.addProperty("sequence",sequence);knowledge(who).add(contact.soul().toString(),evidence);

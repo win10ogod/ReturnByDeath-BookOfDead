@@ -30,6 +30,7 @@ public final class RbdEvents {
     private static boolean normalStopping;
     private static final TagKey<EntityType<?>> SENSITIVE=TagKey.create(Registries.ENTITY_TYPE,ResourceLocation.fromNamespaceAndPath("rbd","miasma_sensitive"));
     @SubscribeEvent(priority=EventPriority.LOWEST) public void entityJoined(net.neoforged.neoforge.event.entity.EntityJoinLevelEvent e){
+        VillagerNames.assign(e.getEntity());
         var game=GameSession.current;
         if(game!=null&&!game.transitioning&&e.getLevel() instanceof ServerLevel&&e.getEntity() instanceof LivingEntity actor)game.recorder.joined(actor);
     }
@@ -148,15 +149,16 @@ public final class RbdEvents {
         var game=GameSession.current;
         if(game==null||!(e.getEntity() instanceof ServerPlayer p)||!(e.getTarget() instanceof LivingEntity target))return;
         if(game.transitioning||(RbdConfig.READ_LOCK.get()&&game.reading(p.getUUID()))){e.setCanceled(true);return;}
-        if(!p.hasLineOfSight(target)||!RbdConfig.RECORD_INTERACTIONS.get())return;
+        if(!p.hasLineOfSight(target))return;
+        VillagerNames.assign(target);
+        if(!RbdConfig.RECORD_INTERACTIONS.get())return;
         try{
-            if(RbdConfig.AUTO_NAME_VILLAGERS.get()&&target instanceof net.minecraft.world.entity.npc.Villager&&!target.hasCustomName()){
-                target.setCustomName(Component.literal("旅人 · "+target.getUUID().toString().substring(0,4)));
-                game.recorder.caption(p,target.getName().getString()+" 向你介紹了自己。");
-                game.recorder.caption(target,p.getGameProfile().getName()+" 前來交談。");
-            }
             if(target.hasCustomName()||target instanceof ServerPlayer){
-                game.learn(p.getUUID(),new dev.rbd.memory.MemoryFrame.Contact(target.getUUID(),Perception.name(target),target.getType().toString()));
+                boolean introduced=game.introduce(p.getUUID(),new dev.rbd.memory.MemoryFrame.Contact(target.getUUID(),Perception.name(target),target.getType().toString()));
+                if(introduced&&target instanceof net.minecraft.world.entity.npc.Villager){
+                    game.recorder.caption(p,target.getName().getString()+" 向你介紹了自己。");
+                    game.recorder.caption(target,p.getGameProfile().getName()+" 前來交談。");
+                }
                 game.learn(target.getUUID(),new dev.rbd.memory.MemoryFrame.Contact(p.getUUID(),p.getGameProfile().getName(),p.getType().toString()));
             }
         }catch(Exception ex){fault(game,ex);}
