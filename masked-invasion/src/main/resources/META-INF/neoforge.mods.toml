@@ -1,0 +1,39 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="All Rights Reserved"
+[[mods]]
+modId="masked_invasion"
+version="${version}"
+displayName="假面入侵 / Masked Invasion"
+authors="win10ogod"
+description='''Escalating Rider raids on respawn bases, shared multiplayer defense and connected Return by Death.'''
+[[mixins]]
+config="masked_invasion.mixins.json"
+[[dependencies.masked_invasion]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.1,1.21.2)"
+side="BOTH"
+[[dependencies.masked_invasion]]
+modId="neoforge"
+type="required"
+versionRange="[21.1.248,)"
+side="BOTH"
+[[dependencies.masked_invasion]]
+modId="kamenridercraft"
+type="required"
+versionRange="[1.1.4,1.1.5)"
+ordering="AFTER"
+side="BOTH"
+[[dependencies.masked_invasion]]
+modId="generic_henshin"
+type="required"
+versionRange="[0.1.139,0.1.140)"
+ordering="AFTER"
+side="BOTH"
+[[dependencies.masked_invasion]]
+modId="rbd"
+type="required"
+versionRange="[0.7.9,0.8)"
+ordering="AFTER"
+side="BOTH"

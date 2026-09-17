@@ -1,0 +1,57 @@
+plugins {
+    id 'java-library'
+    id 'net.neoforged.moddev' version '2.0.143'
+}
+version = mod_version
+group = 'dev.maskedinvasion'
+base { archivesName = 'masked-invasion' }
+if (project.hasProperty('invasionBuildDir')) layout.buildDirectory.set(file(project.property('invasionBuildDir')))
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java.withSourcesJar()
+sourceSets { gametest { compileClasspath += sourceSets.main.output; runtimeClasspath += sourceSets.main.output } }
+configurations { gametestImplementation.extendsFrom implementation; gametestRuntimeOnly.extendsFrom runtimeOnly }
+neoForge {
+    version = neo_version
+    addModdingDependenciesTo(sourceSets.gametest)
+    runs {
+        client { client() }
+        server { server(); programArgument '--nogui' }
+        gameTestServer {
+            type = 'gameTestServer'; sourceSet = sourceSets.gametest
+            gameDirectory = layout.buildDirectory.dir('run-gametest').get().asFile
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'masked_invasion'
+        }
+    }
+    mods {
+        masked_invasion { sourceSet sourceSets.main }
+        masked_invasion_tests { sourceSet sourceSets.gametest }
+    }
+}
+dependencies { implementation fileTree('libs') { include '*.jar' }; gametestImplementation fileTree('test-libs') { include '*.jar' } }
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.named('processResources', ProcessResources) {
+    inputs.property 'version', project.version
+    filesMatching('META-INF/neoforge.mods.toml') { expand version: project.version }
+}
+tasks.withType(AbstractArchiveTask).configureEach { preserveFileTimestamps = false; reproducibleFileOrder = true }
+tasks.register('verifyDependencies') {
+    doLast {
+        def lock = new groovy.json.JsonSlurper().parse(file('dependencies.lock.json'))
+        (lock.files + (gradle.startParameter.taskNames.any { it.toLowerCase().contains('gametest') } ? lock.test_files : [])).each { entry ->
+            File dependency = file(entry.path)
+            if (!dependency.isFile()) throw new GradleException("Missing ${entry.path}; run scripts/import-dependencies.py")
+            def digest = java.security.MessageDigest.getInstance('SHA-256')
+            dependency.withInputStream { stream -> byte[] buffer = new byte[65536]; for (int n; (n = stream.read(buffer)) > 0;) digest.update(buffer, 0, n) }
+            if (digest.digest().encodeHex().toString() != entry.sha256) throw new GradleException("Dependency hash differs: ${entry.path}")
+        }
+    }
+}
+tasks.named('compileJava') { dependsOn 'verifyDependencies' }
+tasks.named('runGameTestServer') {
+    doFirst { def f=layout.buildDirectory.file('run-gametest/logs/latest.log').get().asFile; f.parentFile.mkdirs(); f.text='' }
+    doLast {
+        int expected=fileTree('src/gametest/java').matching { include '**/*.java' }.files.sum { (it.getText('UTF-8') =~ /@GameTest\s*\(/).count } as int
+        def result=layout.buildDirectory.file('run-gametest/logs/latest.log').get().asFile.text =~ /All (\d+) required tests passed/
+        if(expected==0 || !result.find() || result.group(1).toInteger()!=expected) throw new GradleException("Expected all ${expected} required GameTests to pass")
+    }
+}

@@ -1,0 +1,71 @@
+name: Build and release Masked Invasion
+on:
+  push:
+    branches: [main]
+    tags: ['masked-invasion-v*']
+    paths: ['masked-invasion/**', '.github/workflows/masked-invasion-release.yml']
+  pull_request:
+    paths: ['masked-invasion/**', '.github/workflows/masked-invasion-release.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c
+      - name: Verify release tag
+        working-directory: masked-invasion
+        run: |
+          version=$(sed -n 's/^mod_version=//p' gradle.properties)
+          if [[ "$GITHUB_REF" == refs/tags/masked-invasion-v* ]]; then
+            test "$GITHUB_REF_NAME" = "masked-invasion-v$version"
+          fi
+      - name: Import pinned dependencies
+        working-directory: masked-invasion
+        run: python scripts/import-dependencies.py --tests
+      - name: Build and verify gameplay
+        working-directory: masked-invasion
+        run: bash gradlew --no-daemon --max-workers=2 build runGameTestServer
+      - name: Checksums
+        working-directory: masked-invasion/build/libs
+        run: sha256sum *.jar > SHA256SUMS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: masked-invasion-release
+          path: masked-invasion/build/libs/*
+          if-no-files-found: error
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/masked-invasion-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          name: masked-invasion-release
+          path: release-assets
+      - name: Publish tested addon
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release-assets/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release-assets/* --verify-tag --latest=false \
+              --title "假面入侵 ${GITHUB_REF_NAME#masked-invasion-v}" \
+              --notes-file masked-invasion/release-notes.txt
+          fi

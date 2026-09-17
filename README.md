@@ -294,3 +294,7 @@ RBD 規則按世界保存、同步至客戶端，設定變更會保留跨回歸�
 GitHub Actions 在 main、PR 和手動觸發時編譯及測試。推送與 `mod_version` 一致的 `v*` 標籤後，自動發布 JAR、原始碼包和 SHA-256；所有必要測試通過才發布。
 
 新增程式及資源維持 All Rights Reserved。原始 MDK 模板授權見 [TEMPLATE_LICENSE.txt](repository/TEMPLATE_LICENSE.txt)。第三方模組 JAR 不隨本專案分發。
+
+## 假面入侵附屬模組
+
+[假面入侵](masked-invasion/README.md) 為騎士輪迴生存 4.1 加入每 3 個遊戲日的據點防守。百界士兵與百界大將使用騎士工藝型態；防守失敗透過現有死歸流程還原世界。附屬模組有獨立建構與發布工作流，標籤為 `masked-invasion-v*`，死歸核心版本維持 0.7.9。

@@ -1,0 +1,165 @@
+{
+  "minecraft": "1.21.1",
+  "neoforge": "21.1.248",
+  "java": 21,
+  "files": [
+    {
+      "path": "libs/kamenridercraft-1.1.4.jar",
+      "sha256": "0ecbdaa341592efc105529a537280965baa21bc2c4c08c5b20d744d915fd3690",
+      "modid": "kamenridercraft",
+      "version": "1.1.4",
+      "license": "MIT License",
+      "project": "https://www.curseforge.com/minecraft/mc-mods/kamen-rider-craft",
+      "source_url": "https://www.curseforge.com/minecraft/mc-mods/kamen-rider-craft/files/8869063",
+      "download_url": "https://edge.forgecdn.net/files/8869/63/kamenridercraft-1.1.4.jar",
+      "update": {
+        "provider": "curseforge",
+        "project_id": 306845,
+        "file_id": 8869063,
+        "channel": "release"
+      }
+    },
+    {
+      "path": "libs/generic_henshin-cf8893780.jar",
+      "sha256": "a2a75fbb94dedb26846118bc242979467b2eb8b5bd187ed17c1e3dec10ff1731",
+      "modid": "generic_henshin",
+      "version": "0.1.139",
+      "license": "WTFPL",
+      "project": "https://www.curseforge.com/minecraft/mc-mods/generic-henshin",
+      "source_url": "https://www.curseforge.com/minecraft/mc-mods/generic-henshin/files/8893780",
+      "download_url": "https://edge.forgecdn.net/files/8893/780/generic_henshin-0.1.139-littlejoys-v316-kickmode-icon-bladesfix.jar",
+      "update": {
+        "provider": "curseforge",
+        "project_id": 1668781,
+        "file_id": 8893780,
+        "channel": "release"
+      }
+    },
+    {
+      "path": "libs/PlayerAnimationLibNeoforge-1.1.6+mc.1.21.1.jar",
+      "sha256": "e41ee06000fc95444a482018ec24b3f1e79eb111ca6b8ca119e61ceabf9136c5",
+      "modid": "player_animation_library",
+      "version": "1.1.6+mc.1.21.1",
+      "license": "MIT License",
+      "project": "https://docs.zigythebird.com/pal/intro",
+      "source_url": "https://modrinth.com/mod/ha1mEyJS/version/yjxtkvnD",
+      "download_url": "https://cdn.modrinth.com/data/ha1mEyJS/versions/yjxtkvnD/PlayerAnimationLibNeoforge-1.1.6%2Bmc.1.21.1.jar",
+      "update": {
+        "provider": "modrinth",
+        "project_id": "ha1mEyJS",
+        "version_id": "yjxtkvnD",
+        "published_at": "2026-08-18T04:43:09.756632Z",
+        "channel": "release"
+      }
+    },
+    {
+      "path": "libs/cloth-config-15.0.140-neoforge.jar",
+      "sha256": "65e722e0d98431a07c45f8bdd8d529a217cc8c175fde1740248bd5c1b4f3c0d4",
+      "modid": "cloth_config",
+      "version": "15.0.140",
+      "license": "GNU LGPLv3",
+      "project": "https://github.com/architectury/ClothConfig/issues/",
+      "source_url": "https://modrinth.com/mod/9s6osm5g/version/izKINKFg",
+      "download_url": "https://cdn.modrinth.com/data/9s6osm5g/versions/izKINKFg/cloth-config-15.0.140-neoforge.jar",
+      "update": {
+        "provider": "modrinth",
+        "project_id": "9s6osm5g",
+        "version_id": "izKINKFg",
+        "published_at": "2024-09-16T17:18:02.926305Z",
+        "channel": "release"
+      }
+    },
+    {
+      "path": "libs/geckolib-neoforge-1.21.1-4.9.3.jar",
+      "sha256": "20a1995e4074f387ff549e2c57ea79dd7d41ee83c6afb9dd6a6e840e592d1c47",
+      "modid": "geckolib",
+      "version": "4.9.3",
+      "license": "MIT",
+      "project": "http://geckolib.com/",
+      "source_url": "https://modrinth.com/mod/8BmcQJ2H/version/Grwn5rUB",
+      "download_url": "https://cdn.modrinth.com/data/8BmcQJ2H/versions/Grwn5rUB/geckolib-neoforge-1.21.1-4.9.3.jar",
+      "update": {
+        "provider": "modrinth",
+        "project_id": "8BmcQJ2H",
+        "version_id": "Grwn5rUB",
+        "published_at": "2026-09-16T07:34:19.892008Z",
+        "channel": "release"
+      }
+    },
+    {
+      "path": "libs/mobplayeranimator-neoforge-1.21.1-1.4.0.jar",
+      "sha256": "cded8a1f98d0f648b8b8dec24f5cec6d38a333790df9ab5994f7be4cd12954a7",
+      "modid": "mobplayeranimator",
+      "version": "1.4.0",
+      "license": "C0-1.0",
+      "project": "",
+      "source_url": "https://modrinth.com/mod/PCU8g6be/version/JrxzuIUx",
+      "download_url": "https://cdn.modrinth.com/data/PCU8g6be/versions/JrxzuIUx/mobplayeranimator-neoforge-1.21.1-1.4.0.jar",
+      "update": {
+        "provider": "modrinth",
+        "project_id": "PCU8g6be",
+        "version_id": "JrxzuIUx",
+        "published_at": "2026-04-29T07:22:12.204489Z",
+        "channel": "release"
+      }
+    },
+    {
+      "path": "libs/player-animation-lib-forge-2.0.4+1.21.1.jar",
+      "sha256": "dbe5de45f5cd60c0e5e47af14e6d564534a98456e973cf670cb881f6938eee92",
+      "modid": "playeranimator",
+      "version": "2.0.4+1.21.1",
+      "license": "MIT",
+      "project": "https://github.com/KosmX/minecraftPlayerAnimator",
+      "source_url": "https://modrinth.com/mod/gedNE4y2/version/HJZB6bmA",
+      "download_url": "https://cdn.modrinth.com/data/gedNE4y2/versions/HJZB6bmA/player-animation-lib-forge-2.0.4%2B1.21.1.jar",
+      "update": {
+        "provider": "modrinth",
+        "project_id": "gedNE4y2",
+        "version_id": "HJZB6bmA",
+        "published_at": "2025-12-28T21:00:18.426451Z",
+        "channel": "beta"
+      }
+    },
+    {
+      "path": "libs/timeclock-4.7.0-neoforge-1.21.1.jar",
+      "sha256": "87c0394640046b591e14abc78ca94a973d7e5a2ca09eb88f4de999d44eeb63bb",
+      "modid": "timeclock",
+      "version": "4.7.0",
+      "license": "MIT",
+      "project": "https://www.curseforge.com/minecraft/mc-mods/time-stop-clock-mod",
+      "source_url": "https://modrinth.com/mod/KZOjyOXV/version/YPUMGIbu",
+      "download_url": "https://cdn.modrinth.com/data/KZOjyOXV/versions/YPUMGIbu/timeclock-4.7.0-neoforge-1.21.1.jar",
+      "update": {
+        "provider": "modrinth",
+        "project_id": "KZOjyOXV",
+        "version_id": "YPUMGIbu",
+        "published_at": "2026-08-04T11:29:30.842335Z",
+        "channel": "release"
+      }
+    },
+    {
+      "path": "libs/rbd-0.7.9.jar",
+      "sha256": "c8e36af329b46e247895d444647976b1a5e22b9b14a4f9b988091eb69f929386",
+      "modid": "rbd",
+      "version": "0.7.9",
+      "download_url": "https://github.com/win10ogod/ReturnByDeath-BookOfDead/releases/download/v0.7.9/rbd-0.7.9.jar"
+    }
+  ],
+  "test_files": [
+    {
+      "path": "test-libs/krc-villagers-1.2.0.jar",
+      "sha256": "6fd26ff45650b7a91535a5e7bcec4d63017850504c142ba5d04caa4dd715de40",
+      "download_url": "https://github.com/win10ogod/krc-villagers/releases/download/v1.2.0/krc-villagers-1.2.0.jar"
+    },
+    {
+      "path": "test-libs/MobLassos-v21.1.1-1.21.1-NeoForge.jar",
+      "sha256": "e13339101ba6f52f6c1bd2a719c6406e06953ad9d139d1286c749ef67a282ccf",
+      "download_url": "https://cdn.modrinth.com/data/ftOBbnu8/versions/Qsj3YEUS/MobLassos-v21.1.1-1.21.1-NeoForge.jar"
+    },
+    {
+      "path": "test-libs/PuzzlesLib-v21.1.60-mc1.21.1-NeoForge.jar",
+      "sha256": "179bcaafb812618834ba82e7f29b15eaee8894f74fb96152a51cfc22ad4f45c4",
+      "download_url": "https://cdn.modrinth.com/data/QAGBst4M/versions/lh44g7RC/PuzzlesLib-v21.1.60-mc1.21.1-NeoForge.jar"
+    }
+  ]
+}

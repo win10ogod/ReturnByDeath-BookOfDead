@@ -1,0 +1,354 @@
+{
+  "schema": 1,
+  "forms": [
+    {
+      "id": "arcle",
+      "tier": "basic",
+      "belt": "arcle",
+      "forms": []
+    },
+    {
+      "id": "alter_ring",
+      "tier": "basic",
+      "belt": "alter_ring",
+      "forms": []
+    },
+    {
+      "id": "faiz_driver",
+      "tier": "basic",
+      "belt": "faiz_driver",
+      "forms": []
+    },
+    {
+      "id": "kaixa_driver",
+      "tier": "basic",
+      "belt": "kaixa_driver",
+      "forms": []
+    },
+    {
+      "id": "delta_driver",
+      "tier": "basic",
+      "belt": "delta_driver",
+      "forms": []
+    },
+    {
+      "id": "wdriver",
+      "tier": "basic",
+      "belt": "wdriver",
+      "forms": []
+    },
+    {
+      "id": "acceldriver",
+      "tier": "basic",
+      "belt": "acceldriver",
+      "forms": []
+    },
+    {
+      "id": "lostdriver_joker",
+      "tier": "basic",
+      "belt": "lostdriver_joker",
+      "forms": []
+    },
+    {
+      "id": "lostdriver_skull",
+      "tier": "basic",
+      "belt": "lostdriver_skull",
+      "forms": []
+    },
+    {
+      "id": "sengoku_driver_gaim",
+      "tier": "basic",
+      "belt": "sengoku_driver_gaim",
+      "forms": []
+    },
+    {
+      "id": "sengoku_driver_baron",
+      "tier": "basic",
+      "belt": "sengoku_driver_baron",
+      "forms": []
+    },
+    {
+      "id": "sengoku_driver_ryugen",
+      "tier": "basic",
+      "belt": "sengoku_driver_ryugen",
+      "forms": []
+    },
+    {
+      "id": "sengoku_driver_zangetsu",
+      "tier": "basic",
+      "belt": "sengoku_driver_zangetsu",
+      "forms": []
+    },
+    {
+      "id": "build_driver",
+      "tier": "basic",
+      "belt": "build_driver",
+      "forms": []
+    },
+    {
+      "id": "build_driver_cross_z",
+      "tier": "basic",
+      "belt": "build_driver_cross_z",
+      "forms": []
+    },
+    {
+      "id": "hiden_zero_one_driver",
+      "tier": "basic",
+      "belt": "hiden_zero_one_driver",
+      "forms": []
+    },
+    {
+      "id": "shotriser_vulcan",
+      "tier": "basic",
+      "belt": "shotriser_vulcan",
+      "forms": []
+    },
+    {
+      "id": "shotriser_valkyrie",
+      "tier": "basic",
+      "belt": "shotriser_valkyrie",
+      "forms": []
+    },
+    {
+      "id": "drivedriver",
+      "tier": "basic",
+      "belt": "drivedriver",
+      "forms": []
+    },
+    {
+      "id": "wizardriver",
+      "tier": "basic",
+      "belt": "wizardriver",
+      "forms": []
+    },
+    {
+      "id": "arcle:kuuga_dragon",
+      "tier": "basic",
+      "belt": "arcle",
+      "forms": [
+        "kuuga_dragon"
+      ]
+    },
+    {
+      "id": "arcle:kuuga_pegasus",
+      "tier": "basic",
+      "belt": "arcle",
+      "forms": [
+        "kuuga_pegasus"
+      ]
+    },
+    {
+      "id": "arcle:kuuga_titan",
+      "tier": "basic",
+      "belt": "arcle",
+      "forms": [
+        "kuuga_titan"
+      ]
+    },
+    {
+      "id": "alter_ring:agito_flame",
+      "tier": "basic",
+      "belt": "alter_ring",
+      "forms": [
+        "agito_flame"
+      ]
+    },
+    {
+      "id": "alter_ring:agito_storm",
+      "tier": "basic",
+      "belt": "alter_ring",
+      "forms": [
+        "agito_storm"
+      ]
+    },
+    {
+      "id": "hiden_zero_one_driver:biting_shark_progrisekey",
+      "tier": "basic",
+      "belt": "hiden_zero_one_driver",
+      "forms": [
+        "biting_shark_progrisekey"
+      ]
+    },
+    {
+      "id": "hiden_zero_one_driver:flaming_tiger_progrisekey",
+      "tier": "basic",
+      "belt": "hiden_zero_one_driver",
+      "forms": [
+        "flaming_tiger_progrisekey"
+      ]
+    },
+    {
+      "id": "hiden_zero_one_driver:freezing_bear_progrisekey",
+      "tier": "basic",
+      "belt": "hiden_zero_one_driver",
+      "forms": [
+        "freezing_bear_progrisekey"
+      ]
+    },
+    {
+      "id": "build_drill",
+      "tier": "basic",
+      "belt": "build_driver",
+      "forms": [],
+      "weapon": "drill_crusher"
+    },
+    {
+      "id": "arcle:kuuga_rising_mighty",
+      "tier": "enhanced",
+      "belt": "arcle",
+      "forms": [
+        "kuuga_rising_mighty"
+      ]
+    },
+    {
+      "id": "arcle:kuuga_rising_dragon",
+      "tier": "enhanced",
+      "belt": "arcle",
+      "forms": [
+        "kuuga_rising_dragon"
+      ]
+    },
+    {
+      "id": "arcle:kuuga_rising_titan",
+      "tier": "enhanced",
+      "belt": "arcle",
+      "forms": [
+        "kuuga_rising_titan"
+      ]
+    },
+    {
+      "id": "build_driver:rabbittank_sparkling_full_bottle",
+      "tier": "enhanced",
+      "belt": "build_driver",
+      "forms": [
+        "rabbittank_sparkling_full_bottle"
+      ]
+    },
+    {
+      "id": "hiden_zero_one_driver:shining_hopper_progrisekey",
+      "tier": "enhanced",
+      "belt": "hiden_zero_one_driver",
+      "forms": [
+        "shining_hopper_progrisekey"
+      ]
+    },
+    {
+      "id": "hiden_zero_one_driver:shining_assault_hopper_progrisekey",
+      "tier": "enhanced",
+      "belt": "hiden_zero_one_driver",
+      "forms": [
+        "shining_assault_hopper_progrisekey"
+      ]
+    },
+    {
+      "id": "wdriver:fang_memory",
+      "tier": "enhanced",
+      "belt": "wdriver",
+      "forms": [
+        "fang_memory"
+      ]
+    },
+    {
+      "id": "alter_ring:agito_trinity",
+      "tier": "enhanced",
+      "belt": "alter_ring",
+      "forms": [
+        "agito_trinity"
+      ]
+    },
+    {
+      "id": "build_driver:hazard_trigger",
+      "tier": "super",
+      "belt": "build_driver",
+      "forms": [
+        "hazard_trigger"
+      ]
+    },
+    {
+      "id": "hiden_zero_one_driver:metalcluster_hopper_progrisekey",
+      "tier": "super",
+      "belt": "hiden_zero_one_driver",
+      "forms": [
+        "metalcluster_hopper_progrisekey"
+      ]
+    },
+    {
+      "id": "sengoku_driver_gaim:kachidoki_lockseed",
+      "tier": "super",
+      "belt": "sengoku_driver_gaim",
+      "forms": [
+        "kachidoki_lockseed"
+      ]
+    },
+    {
+      "id": "alter_ring:agito_burning",
+      "tier": "super",
+      "belt": "alter_ring",
+      "forms": [
+        "agito_burning"
+      ]
+    },
+    {
+      "id": "arcle:kuuga_amazing_mighty",
+      "tier": "super",
+      "belt": "arcle",
+      "forms": [
+        "kuuga_amazing_mighty"
+      ]
+    },
+    {
+      "id": "build_driver:genius_full_bottle",
+      "tier": "final",
+      "belt": "build_driver",
+      "forms": [
+        "genius_full_bottle"
+      ]
+    },
+    {
+      "id": "arcle:kuuga_ultimate",
+      "tier": "final",
+      "belt": "arcle",
+      "forms": [
+        "kuuga_ultimate"
+      ]
+    },
+    {
+      "id": "alter_ring:agito_shining",
+      "tier": "final",
+      "belt": "alter_ring",
+      "forms": [
+        "agito_shining"
+      ]
+    },
+    {
+      "id": "wdriver:xtreme_memory",
+      "tier": "final",
+      "belt": "wdriver",
+      "forms": [
+        "xtreme_memory"
+      ]
+    },
+    {
+      "id": "sengoku_driver_gaim:kiwami_lockseed",
+      "tier": "final",
+      "belt": "sengoku_driver_gaim",
+      "forms": [
+        "kiwami_lockseed"
+      ]
+    },
+    {
+      "id": "wizardriver:infinity_ring",
+      "tier": "final",
+      "belt": "wizardriver",
+      "forms": [
+        "infinity_ring"
+      ]
+    },
+    {
+      "id": "hiden_zero_two_driver",
+      "tier": "final",
+      "belt": "hiden_zero_two_driver",
+      "forms": []
+    }
+  ]
+}
