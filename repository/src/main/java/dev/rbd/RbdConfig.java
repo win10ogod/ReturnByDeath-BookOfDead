@@ -26,7 +26,8 @@ public final class RbdConfig {
     public static final Setting<Boolean> RECORD_SOUNDS=WorldRules.bool("rbdRecordSounds",()->true);
     public static final Setting<Boolean> RECORD_INTERACTIONS=WorldRules.bool("rbdRecordInteractions",()->true);
     public static final Setting<Boolean> RECORD_BLOCK_ACTIONS=WorldRules.bool("rbdRecordBlockActions",()->true);
-    public static final Setting<Boolean> AUTO_NAME_VILLAGERS=WorldRules.bool("rbdAutoNameVillagers",()->true);
+    public static final Setting<Boolean> PLAYER_NAME_VILLAGERS=WorldRules.bool("rbdPlayerNameVillagers",()->true);
+    public static final Setting<Integer> VILLAGER_NAME_LENGTH=WorldRules.integer("rbdVillagerNameMaxLength",()->32,1,256);
     public static final Setting<Double> CONTACT_RANGE=WorldRules.decimal("rbdRecognitionRange",()->16.0,0,256);
     public static final Setting<Double> CONTACT_DOT=WorldRules.decimal("rbdRecognitionLookDot",()->0.65,-1,1);
     public static final Setting<Double> RASTER_FOV=WorldRules.decimal("rbdPerceptionFovScale",()->0.70,0.01,10);

@@ -26,6 +26,7 @@ public final class GameSession implements AutoCloseable {
     public final AuthorityRoster authorities;
     private JsonObject savedSoul;
     private final dev.rbd.core.AutoCheckpointClock autoCheckpoint;
+    private final VillagerNaming villagerNaming=new VillagerNaming();
     private final Map<UUID,JsonObject> pendingDeaths=new LinkedHashMap<>();
     public boolean transitioning;
     public String queuedMilestone;
@@ -265,6 +266,12 @@ public final class GameSession implements AutoCloseable {
         synchronized(asyncUploads){imagesClosed=true;asyncUploads.values().forEach(dev.rbd.network.AsyncImageUpload::close);asyncUploads.clear();}
     }
     public void message(ServerPlayer p,JsonObject msg) throws IOException {
+        if(msg.get("kind").getAsString().equals("villager_name_open")){
+            RbdNetwork.send(p,villagerNaming.open(this,p,UUID.fromString(msg.get("entity").getAsString())));return;
+        }
+        if(msg.get("kind").getAsString().equals("villager_name_save")){
+            RbdNetwork.send(p,villagerNaming.rename(this,p,msg));return;
+        }
         if(transitioning)return;
         String kind=msg.get("kind").getAsString();
         if(kind.equals("image_chunk")){

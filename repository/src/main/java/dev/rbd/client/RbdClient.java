@@ -15,7 +15,7 @@ import java.util.zip.GZIPInputStream;
 @EventBusSubscriber(modid="rbd",value=Dist.CLIENT)
 public final class RbdClient {
     private static final Map<String,StringBuilder> chunks=new HashMap<>();
-    @SubscribeEvent public static void tick(ClientTickEvent.Post event){ReturnLifecycle.tick();ImmersionOverlay.tick();}
+    @SubscribeEvent public static void tick(ClientTickEvent.Post event){ReturnLifecycle.tick();ImmersionOverlay.tick();VillagerNameKeys.tick();}
     @SubscribeEvent public static void presented(net.neoforged.neoforge.client.event.RenderFrameEvent.Post e){if(Minecraft.getInstance().screen instanceof MemoryScreen memory)memory.presented();}
     @SubscribeEvent public static void logout(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut e){ClientRecorder.shutdown();chunks.clear();ConnectedClientReturn.clear();CheckpointNotice.clear();dev.rbd.rules.WorldRules.clearClient();}
     public static void send(JsonObject message){PacketDistributor.sendToServer(new MessagePayload(message.toString()));}
@@ -35,7 +35,12 @@ public final class RbdClient {
             }
             case "compat_test" -> dev.rbd.testing.CompatClient.receive(msg);
             case "checkpoint_saving" -> CheckpointNotice.saving();
-            case "transition" -> {ReturnLifecycle.begin(msg);if(mc.screen instanceof MemoryScreen)mc.setScreen(null);}
+            case "transition" -> {ReturnLifecycle.begin(msg);if(mc.screen instanceof MemoryScreen||mc.screen instanceof VillagerNameScreen)mc.setScreen(null);}
+            case "villager_name_opened" -> {if(mc.player!=null&&mc.screen==null&&!ConnectedClientReturn.paused)mc.setScreen(new VillagerNameScreen(msg));}
+            case "villager_name_result" -> {
+                if(mc.screen instanceof VillagerNameScreen screen&&screen.accepts(msg))screen.result(msg);
+                else if(mc.player!=null)mc.player.displayClientMessage(net.minecraft.network.chat.Component.translatable(msg.get("message").getAsString()),true);
+            }
             case "world_rules" -> dev.rbd.rules.WorldRules.receive(msg.getAsJsonObject("values"));
             case "world_reset" -> ConnectedClientReturn.reset();
             case "transition_complete" -> {ConnectedClientReturn.complete();CheckpointNotice.complete();}

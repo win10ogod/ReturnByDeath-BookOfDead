@@ -30,7 +30,6 @@ public final class RbdEvents {
     private static boolean normalStopping;
     private static final TagKey<EntityType<?>> SENSITIVE=TagKey.create(Registries.ENTITY_TYPE,ResourceLocation.fromNamespaceAndPath("rbd","miasma_sensitive"));
     @SubscribeEvent(priority=EventPriority.LOWEST) public void entityJoined(net.neoforged.neoforge.event.entity.EntityJoinLevelEvent e){
-        VillagerNames.assign(e.getEntity());
         var game=GameSession.current;
         if(game!=null&&!game.transitioning&&e.getLevel() instanceof ServerLevel&&e.getEntity() instanceof LivingEntity actor)game.recorder.joined(actor);
     }
@@ -150,7 +149,6 @@ public final class RbdEvents {
         if(game==null||!(e.getEntity() instanceof ServerPlayer p)||!(e.getTarget() instanceof LivingEntity target))return;
         if(game.transitioning||(RbdConfig.READ_LOCK.get()&&game.reading(p.getUUID()))){e.setCanceled(true);return;}
         if(!p.hasLineOfSight(target))return;
-        VillagerNames.assign(target);
         if(!RbdConfig.RECORD_INTERACTIONS.get())return;
         try{
             if(target.hasCustomName()||target instanceof ServerPlayer){
