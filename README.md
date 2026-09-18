@@ -2,7 +2,7 @@
 
 Minecraft **1.21.1** · NeoForge **21.1.235** · Java **21**
 
-[下載模組](https://github.com/win10ogod/ReturnByDeath-BookOfDead/releases/latest) · [自動建置](https://github.com/win10ogod/ReturnByDeath-BookOfDead/actions)
+[下載模組](https://github.com/win10ogod/ReturnByDeath-BookOfDead/releases/latest) · [自動建置](https://github.com/win10ogod/ReturnByDeath-BookOfDead/actions) · [假面入侵指令 Wiki](masked-invasion/wiki/README.md)
 
 死亡後回到共同回歸點，保留跨輪迴記憶。死者之書記錄生前經歷，讀者按順序追體驗，直至死亡的失聲與黑暗。
 

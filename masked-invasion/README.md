@@ -22,6 +22,8 @@ Minecraft 1.21.1 / NeoForge 21.1.248 的據點防守附屬模組。依賴騎士�
 
 ## 指令
 
+[完整指令 Wiki](wiki/README.md)：指令權限、玩家／主控台語法、30 項遊戲規則、常用設定範例、型態池與疑難排解。
+
 - `/masked_invasion status`：任何玩家查詢自己的進度。
 - `/masked_invasion start [player] [wave]`：OP 2 啟動測試入侵，仍需有效回歸點與持有者。
 - `/masked_invasion stop`：OP 2 取消入侵，移除入侵者並重新排程。
